@@ -71,8 +71,17 @@ docx-color manuscript.docx manuscript_colored.docx --report report.json
 Choose different insertion and unchanged-text colors:
 
 ```bash
-docx-color manuscript.docx manuscript_colored.docx --red 0000FF --black 000000
+docx-color manuscript.docx manuscript_colored.docx --inserted-color 0000FF --unchanged-color 000000
 ```
+
+The equivalent short options are `-ic` and `-uc`:
+
+```bash
+docx-color manuscript.docx manuscript_colored.docx -ic 0000FF -uc 000000
+```
+
+The color options replace the former `--red` and `--black` names. Update existing
+commands to use `--inserted-color` and `--unchanged-color`; the default colors are unchanged.
 
 ## Example: a Nature-style manuscript
 
@@ -107,7 +116,7 @@ the converted DOCX. See [example details](examples/README.md).
 ## Command-line reference
 
 ```text
-docx-color [-h] [--red RED] [--black BLACK] [--report REPORT]
+docx-color [-h] [--inserted-color RGB] [--unchanged-color RGB] [--report REPORT]
            [--no-strict] input [output]
 ```
 
@@ -115,8 +124,8 @@ docx-color [-h] [--red RED] [--black BLACK] [--report REPORT]
 | --- | --- | --- |
 | `input` | Source DOCX containing tracked changes | Required |
 | `output` | Destination DOCX | `<input_stem>_colored.docx` |
-| `--red` | Color for inserted text, as six hexadecimal digits without `#` | `FF0000` |
-| `--black` | Color for unchanged text, in the same format | `000000` |
+| `-ic`, `--inserted-color` | Color for inserted text, as six hexadecimal digits without `#` | `FF0000` |
+| `-uc`, `--unchanged-color` | Color for unchanged text, in the same format | `000000` |
 | `--report` | Path for a JSON conversion-statistics report | No report file |
 | `--no-strict` | Legacy compatibility option; does **not** bypass safety checks | Disabled |
 | `-h`, `--help` | Show command help | — |

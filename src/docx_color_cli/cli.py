@@ -239,15 +239,15 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description='Accept DOCX text revisions: inserted red, unchanged black, deleted omitted.')
     parser.add_argument('input', type=Path)
     parser.add_argument('output', nargs='?', type=Path)
-    parser.add_argument('--red', default='FF0000', help='Inserted text RGB hex')
-    parser.add_argument('--black', default='000000', help='Other text RGB hex')
+    parser.add_argument('-ic', '--inserted-color', metavar='RGB', default='FF0000', help='Inserted text color: six hexadecimal digits (default: FF0000)')
+    parser.add_argument('-uc', '--unchanged-color', metavar='RGB', default='000000', help='Unchanged text color: six hexadecimal digits (default: 000000)')
     parser.add_argument('--report', type=Path, help='Write JSON summary')
     parser.add_argument('--no-strict', action='store_true', help='Legacy option; unsupported revisions are still rejected')
     args = parser.parse_args(argv)
     destination = args.output or args.input.with_name(args.input.stem + '_colored.docx')
     if destination.suffix.lower() != '.docx':
         parser.error('Output must be a .docx file')
-    stats = convert(args.input, destination, strict=not args.no_strict, black=args.black, red=args.red, _report=args.report)
+    stats = convert(args.input, destination, strict=not args.no_strict, black=args.unchanged_color, red=args.inserted_color, _report=args.report)
     print(f'Saved: {destination}')
     print(json.dumps(stats, indent=2))
 
