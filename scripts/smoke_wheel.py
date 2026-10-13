@@ -74,6 +74,15 @@ def check_distributions(wheel, version):
             assert any(n.endswith("/" + required) for n in names), required
 
 
+def assert_installed_location(location, venv):
+    """Reject imports outside the independently installed wheel environment."""
+    # macOS may return /private/var for an environment created through /var.
+    # Resolve both paths, including links that could escape the environment.
+    assert location.resolve(strict=True).is_relative_to(venv.resolve(strict=True)), (
+        location
+    )
+
+
 def smoke(wheel):
     version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
     check_distributions(wheel, version)
@@ -112,7 +121,7 @@ def smoke(wheel):
                 "import docx_color_cli; print(docx_color_cli.__file__)",
             ).strip()
         )
-        assert location.is_relative_to(venv), location
+        assert_installed_location(location, venv)
         assert "--check" in run(command, "--help")
         assert run(command, "--version").strip().endswith(" " + version)
         assert run(alias, "--version").strip().endswith(" " + version)
