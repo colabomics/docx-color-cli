@@ -18,5 +18,8 @@ tests/fixtures/academic/
 /AGENTS.md
 
 # Explicitly public synthetic demonstration; private DOCX files stay ignored.
-!/examples/nature-style/tracked.docx
-!/examples/nature-style/colored.docx
+!/examples/tracked.docx
+!/examples/colored.docx
+/examples/generate.py
+/examples/render.js
+/examples/render.cjs

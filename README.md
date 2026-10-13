@@ -76,21 +76,22 @@ docx-color manuscript.docx manuscript_colored.docx --red 0000FF --black 000000
 
 ## Example: a Nature-style manuscript
 
-Try the included, two-page synthetic manuscript. Its title, author block, bold
+Try the included, four-page synthetic manuscript (approximately 1,450 words after acceptance). Its title, author block, bold
 summary, numbered citation, references, table and Methods follow an abridged
 structure inspired by [Nature's formatting guide](https://www.nature.com/nature/for-authors/formatting-guide).
 All names, data and the numbered reference are fictional; this is not an official
 Nature template or a published paper.
 
-Download the [tracked input](examples/nature-style/tracked.docx) and
-[converted output](examples/nature-style/colored.docx), or run from the checkout:
+Download the [tracked input](examples/tracked.docx) and
+[converted output](examples/colored.docx), or run from the checkout:
 
 ```bash
-uv run docx-color examples/nature-style/tracked.docx examples/nature-style/colored.docx
+uv run docx-color examples/tracked.docx examples/colored.docx
 ```
 
-This example accepts seven insertions and removes six deletion containers while
-preserving the table, equation and editable citation/hyperlink fields.
+Four fictional authors contribute **124 revision markers: 73 insertions and 51
+deletions** across the title, summary, results, discussion, Methods and table.
+The converted document preserves two equations and editable citation/hyperlink fields.
 
 | Before: tracked revisions | After: accepted and colored |
 | --- | --- |
@@ -99,8 +100,9 @@ preserving the table, equation and editable citation/hyperlink fields.
 Screenshots show the actual DOCX files' first pages rendered in a browser with
 [docx-preview](https://github.com/VolodymyrBaydalka/docxjs). They are **not Microsoft
 Word screenshots** or evidence of identical Word layout. The input preview uses
-green underlines and red strikethroughs for revisions; output colors come from
-the converted DOCX. See [example generation and screenshot instructions](examples/nature-style/README.md).
+distinct colors for each author, underlined insertions and struck-through deletions;
+author names are read from the DOCX revision metadata. Output colors come from
+the converted DOCX. See [example details](examples/README.md).
 
 ## Command-line reference
 
