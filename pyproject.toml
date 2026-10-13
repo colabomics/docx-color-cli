@@ -6,16 +6,29 @@ build-backend = "hatchling.build"
 name = "docx-color-cli"
 version = "0.3.0"
 description = "Convert DOCX tracked text revisions into permanent font colors"
+readme = "README.md"
+authors = [{name = "lzj1769", email = "lzj1769@gmail.com"}]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+]
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = ["lxml>=5"]
 
+[project.urls]
+Repository = "https://github.com/colabomics/docx-color-cli"
+Issues = "https://github.com/colabomics/docx-color-cli/issues"
+
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "ruff==0.16.6", "packaging>=24", "twine>=6", "pyyaml>=6"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -25,6 +38,7 @@ markers = ["word_reference: requires a manually supplied Microsoft Word accepted
 
 [project.scripts]
 docx-color = "docx_color_cli.cli:main"
+docx-color-cli = "docx_color_cli.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/docx_color_cli"]
@@ -41,9 +55,19 @@ include = [
     "/tests/fixtures/complex/README.md",
     "/docs/*.md",
     "/README.md",
+    "/RELEASE.md",
+    "/scripts/**/*.py",
+    "/.github/workflows/*.yml",
+    "/release-provenance.json",
     "/LICENSE",
     "/AGENTS.md",
     "/pyproject.toml",
     "/uv.lock",
 ]
 exclude = ["/tests/fixtures/academic/**", "**/*.docx", "**/.DS_Store"]
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "UP", "SIM"]

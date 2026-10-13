@@ -1,5 +1,10 @@
 # docx-color-cli
 
+[![PyPI](https://img.shields.io/pypi/v/docx-color-cli)](https://pypi.org/project/docx-color-cli/)
+[![Python](https://img.shields.io/pypi/pyversions/docx-color-cli)](https://pypi.org/project/docx-color-cli/)
+[![CI](https://github.com/colabomics/docx-color-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/colabomics/docx-color-cli/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/colabomics/docx-color-cli/blob/main/LICENSE)
+
 Accept tracked changes in Word documents and turn inserted text into permanent
 font colors.
 
@@ -14,26 +19,38 @@ with every Word document and identical rendering in Microsoft Word are not guara
 
 ## Installation
 
-Install from a local source checkout. The commands below do not assume a release
-is available on PyPI.
+Requires **Python 3.11+**. CI tests Python 3.11, 3.12 and 3.13 on Linux, macOS and
+Windows. The only runtime dependency is `lxml`; Microsoft Word is not required.
 
-### With uv
-
-From the project directory, install the CLI in an isolated tool environment:
+Recommended: run directly with uv (after a release is available on PyPI):
 
 ```bash
-uv tool install .
-docx-color --help
+uvx docx-color-cli input.docx output.docx
 ```
 
-### With pip
-
-Use an activated Python 3.11+ virtual environment:
+Alternatively, install the command in an isolated tool environment:
 
 ```bash
-python -m pip install .
+uv tool install docx-color-cli
+docx-color input.docx output.docx
 docx-color --help
+docx-color --version
 ```
+
+The `docx-color-cli` command is an alias for `docx-color`, allowing the package-name
+`uvx` invocation above. Both commands use the same implementation.
+
+With pip, use a Python 3.11+ virtual environment:
+
+```bash
+python -m pip install docx-color-cli
+```
+
+To install an unreleased checkout, run `uv tool install .` in the repository.
+
+[GitHub repository](https://github.com/colabomics/docx-color-cli) ·
+[PyPI package](https://pypi.org/project/docx-color-cli/) ·
+[Release procedure](https://github.com/colabomics/docx-color-cli/blob/main/RELEASE.md)
 
 ## Quick start
 
@@ -80,8 +97,8 @@ docx-color manuscript.docx manuscript_colored.docx -ic 0000FF -uc 000000
 
 Try the included, four-page synthetic manuscript (approximately 1,450 words after acceptance).
 
-Download the [tracked input](examples/tracked.docx) and
-[converted output](examples/colored.docx), or run from the checkout:
+Download the [tracked input](https://github.com/colabomics/docx-color-cli/raw/refs/heads/main/examples/tracked.docx) and
+[converted output](https://github.com/colabomics/docx-color-cli/raw/refs/heads/main/examples/colored.docx), or run from the checkout:
 
 Four fictional authors contribute **124 revision markers: 73 insertions and 51
 deletions** across the title, summary, results, discussion, Methods and table.
@@ -91,7 +108,7 @@ The converted document preserves two equations and editable citation/hyperlink f
 uv run docx-color examples/tracked.docx examples/colored.docx
 ```
 
-![Animated workflow showing tracked edits, the conversion command and red-and-black output](assets/demo.gif)
+![Animated workflow showing tracked edits, the conversion command and red-and-black output](https://raw.githubusercontent.com/colabomics/docx-color-cli/main/assets/demo.gif)
 
 To compare against a separate DOCX manually saved after **Accept All Changes** in
 Microsoft Word, enable reference validation:
@@ -106,11 +123,26 @@ resources, ignoring font colors and equivalent run splitting. It is conservative
 Word re-save differences can also cause a rejection. It does not verify the
 reference's provenance or identical page layout. No Word automation is used.
 
+## Check without publishing
+
+```bash
+docx-color manuscript.docx --check
+```
+
+Check mode runs the same conversion, retention, package-integrity and optional
+`--reference` checks using disposable temporary storage. It leaves the input and
+existing outputs untouched and removes the temporary DOCX. Exit code 0 means the
+input passed the supported conversion checks; invalid or unsupported input exits
+nonzero. This is not a Word rendering or complete schema check. `--check` cannot
+be combined with an output path or `--report`.
+
+Unsupported revisions are always rejected; there is no permissive mode.
+
 ## Command-line reference
 
 ```text
-docx-color [-h] [--inserted-color RGB] [--unchanged-color RGB] [--report REPORT]
-           [--reference REFERENCE] [--no-strict] input [output]
+docx-color [-h] [--version] [--inserted-color RGB] [--unchanged-color RGB] [--report REPORT]
+           [--reference REFERENCE] [--check] input [output]
 ```
 
 | Argument | Description | Default |
@@ -121,8 +153,9 @@ docx-color [-h] [--inserted-color RGB] [--unchanged-color RGB] [--report REPORT]
 | `-uc`, `--unchanged-color` | Color for unchanged text, in the same format | `000000` |
 | `--reference` | Word-accepted DOCX; mismatches block output publication | No external comparison |
 | `--report` | Path for a JSON conversion-statistics report | No report file |
-| `--no-strict` | Legacy compatibility option; does **not** bypass safety checks | Disabled |
+| `--check` | Validate input and conversion support without publishing output | Disabled |
 | `-h`, `--help` | Show command help | — |
+| `--version` | Show the installed package version | — |
 
 Successful conversion prints the output path and statistics. Errors return a
 nonzero exit status. The JSON report contains operation counts, not a certification
@@ -199,6 +232,23 @@ The private academic sample's body passes bounded semantic comparison, while ful
 comparison still detects font-signature differences. These remain deliberately
 unignored. This is evidence for the tested sample, not a guarantee for all documents.
 
+## Python API and diagnostics
+
+`docx_color_cli.cli` exposes `modify(root, stats, original, added)`,
+`convert(source, target, *, black, red, reference)` and
+`convert_output(source, target, *, black, red, reference)`, retaining their existing
+color defaults. They no longer accept a `strict` parameter. `check(source, *,
+black, red, reference)` runs the same checks without publication.
+
+Expected conversion failures raise `ConversionError` from `docx_color_cli.errors`
+(a `ValueError` subclass). Diagnostics expose `part`, `revision_type`, `element`,
+`xpath`, `line` and `cause_type` when available; unavailable fields are `None`.
+`UnsupportedRevisionError` identifies unsupported revisions or associated structures.
+`PublicationError` also exposes `destination` and `output_published`, so callers
+can distinguish a failed DOCX publication from a later report failure. Wrapped
+errors retain their original exception as `__cause__`. CLI errors go to stderr
+with a nonzero exit code and no ordinary traceback.
+
 ## File safety
 
 The input document is preserved. Input, output, reference and report paths must identify
@@ -209,10 +259,13 @@ Output is written to a temporary file beside the destination and checked before
 atomic replacement. Conversion or validation failure preserves an existing output.
 **Successful conversion replaces an existing destination file.**
 
-The optional report is published before the DOCX. These are separate atomic
-operations: if final DOCX publication fails, the report may already contain the
-attempted conversion's statistics.
+The optional report is staged before publication and published **after** the
+validated DOCX. If DOCX publication fails, an existing output and report remain
+unchanged, and no success message is printed. These are separate atomic operations:
+if report publication fails after the DOCX is published, the CLI exits nonzero
+and explicitly states that the DOCX was saved but the report failed. The previous
+report, if any, remains unchanged. Temporary files are cleaned up.
 
 ## License
 
-Licensed under the [MIT License](LICENSE).
+Licensed under the [MIT License](https://github.com/colabomics/docx-color-cli/blob/main/LICENSE).

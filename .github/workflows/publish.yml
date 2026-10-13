@@ -1,0 +1,155 @@
+name: Publish
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pypi-release
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    if: github.repository == 'colabomics/docx-color-cli' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      action: ${{ steps.plan.outputs.action }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: python -m pip install uv==0.12.12
+      - run: uv sync
+      - name: Compare TOML version with Git and PyPI
+        id: plan
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
+        run: uv run --no-sync python scripts/release.py detect
+
+  validate:
+    needs: detect
+    if: needs.detect.outputs.action != 'skip'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: [detect, validate]
+    if: needs.detect.outputs.action == 'publish'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: python -m pip install uv==0.12.12
+      - run: uv sync
+      - name: Record source commit and build release artifacts
+        run: |
+          uv run --no-sync python scripts/release.py record
+          uv build
+          uv run --no-sync twine check --strict dist/*
+          uv run --no-sync python scripts/smoke_wheel.py dist/*.whl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: [detect, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.detect.outputs.action == 'publish'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/docx-color-cli/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+      - name: Recheck PyPI immediately before upload
+        id: available
+        env:
+          VERSION: ${{ needs.detect.outputs.version }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from urllib.error import HTTPError
+          from urllib.parse import quote
+          from urllib.request import urlopen
+
+          publish = False
+          try:
+              with urlopen('https://pypi.org/pypi/docx-color-cli/' + quote(os.environ['VERSION']) + '/json', timeout=30):
+                  print('Version is already on PyPI; skipping duplicate upload and verifying artifacts.')
+          except HTTPError as error:
+              if error.code != 404:
+                  raise
+              publish = True
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('publish=' + str(publish).lower() + '\n')
+          PY
+      - name: Publish through PyPI Trusted Publishing
+        if: steps.available.outputs.publish == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # No password/token and no skip-existing: unexpected races fail visibly.
+      - name: Report interrupted publication
+        if: failure()
+        run: |
+          echo '::error::Publication failed and may be partial. Inspect PyPI, then follow RELEASE.md and rerun all jobs; do not blindly retry an upload.'
+          echo 'Publication failed or was interrupted; inspect PyPI before retrying. No GitHub tag/release was created by this job.' >> "$GITHUB_STEP_SUMMARY"
+
+  github-release:
+    needs: [detect, validate, build, publish]
+    if: >-
+      always() && github.ref == 'refs/heads/main' && github.event_name == 'push' &&
+      needs.validate.result == 'success' &&
+      (needs.detect.outputs.action == 'recover' || needs.publish.result == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: python -m pip install uv==0.12.12
+      - run: uv sync
+      - uses: actions/download-artifact@v4
+        if: needs.detect.outputs.action == 'publish'
+        with:
+          name: distributions
+          path: dist/
+      - name: Verify published artifacts, then create missing GitHub metadata
+        env:
+          VERSION: ${{ needs.detect.outputs.version }}
+          RELEASE_ACTION: ${{ needs.detect.outputs.action }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$RELEASE_ACTION" = publish ]; then
+            uv run --no-sync python scripts/release.py github --version "$VERSION" --dist dist
+          else
+            uv run --no-sync python scripts/release.py github --version "$VERSION"
+          fi
+      - name: Report partial release
+        if: failure()
+        run: |
+          echo '::error::PyPI may already contain this version, but verification/tagging/GitHub Release failed. This is a partial release; rerun all jobs after fixing the failure. Never overwrite published artifacts or tags.'
+          echo 'Partial release: inspect the failing step and follow RELEASE.md. PyPI publication is not rolled back.' >> "$GITHUB_STEP_SUMMARY"
