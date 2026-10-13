@@ -1,0 +1,14 @@
+[
+  {"id":"T001_single_insertion", "ops":[["text","A"],["ins","新"],["text","B"]], "expected":[["A","000000"],["新","FF0000"],["B","000000"]]},
+  {"id":"T002_single_deletion", "ops":[["text","A"],["del","gone"],["text","B"]], "expected":[["AB","000000"]]},
+  {"id":"T003_replacement", "ops":[["text","before "],["del","old"],["ins","new"],["text"," after"]], "expected":[["before ","000000"],["new","FF0000"],[" after","000000"]]},
+  {"id":"T004_multiple_insertions", "ops":[["ins","1"],["text","a"],["ins","2"],["text","b"],["ins","3"]], "expected":[["1","FF0000"],["a","000000"],["2","FF0000"],["b","000000"],["3","FF0000"]]},
+  {"id":"T005_multiple_deletions", "ops":[["del","X"],["text","a"],["del","Y"],["text","b"],["del","Z"]], "expected":[["ab","000000"]]},
+  {"id":"T006_alternating_adjacent", "ops":[["del","X"],["ins","1"],["del","Y"],["ins","2"]], "expected":[["12","FF0000"]]},
+  {"id":"T007_adjacent_insertions", "ops":[["ins","one"],["ins","two"],["text"," end"]], "expected":[["onetwo","FF0000"],[" end","000000"]]},
+  {"id":"T008_adjacent_deletions", "ops":[["text","start"],["del","one"],["del","two"]], "expected":[["start","000000"]]},
+  {"id":"T009_special_characters", "ops":[["text","α<&"],["del","删除😀"],["ins","β>😀é́"]], "expected":[["α<&","000000"],["β>😀é́","FF0000"]]},
+  {"id":"T010_spaces_punctuation", "ops":[["text","  A "],["del",","],["ins",";  "],["text"," B  "]], "expected":[["  A ","000000"],[";  ","FF0000"],[" B  ","000000"]]},
+  {"id":"T011_split_runs", "ops":[["text","Hel"],["text","lo "],["ins","wor"],["ins","ld"],["text","!"]], "expected":[["Hello ","000000"],["world","FF0000"],["!","000000"]]},
+  {"id":"T012_empty_revisions", "ops":[["ins",""],["del",""],["text","keep"]], "expected":[["keep","000000"]]}
+]

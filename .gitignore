@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+dist/
+build/
+*.egg-info/
+.DS_Store
+.coverage
+htmlcov/
+.ruff_cache/
+
+# Private, local-only Word reference pairs and generated artifacts.
+tests/fixtures/academic/
+*.docx
+/report.json
+/docs/

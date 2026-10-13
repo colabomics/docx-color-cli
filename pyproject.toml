@@ -5,15 +5,42 @@ build-backend = "hatchling.build"
 [project]
 name = "docx-color-cli"
 version = "0.3.0"
-description = "Color accepted DOCX tracked insertions with optional direct PDF output"
-requires-python = ">=3.10"
+description = "Convert DOCX tracked text revisions into permanent font colors"
+requires-python = ">=3.11"
 dependencies = ["lxml>=5"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+xfail_strict = true
+markers = ["word_reference: requires a manually supplied Microsoft Word accepted-reference pair"]
 
 [project.scripts]
 docx-color = "docx_color_cli.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/docx_color_cli"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src/docx_color_cli/**/*.py",
+    "/tests/**/*.py",
+    "/tests/fixtures/basic/*.json",
+    "/tests/fixtures/paragraphs/*.xml",
+    "/tests/fixtures/tables/*.xml",
+    "/tests/fixtures/fields/*.xml",
+    "/tests/fixtures/equations/*.xml",
+    "/tests/fixtures/complex/README.md",
+    "/docs/*.md",
+    "/README.md",
+    "/AGENTS.md",
+    "/pyproject.toml",
+    "/uv.lock",
+]
+exclude = ["/tests/fixtures/academic/**", "**/*.docx", "**/.DS_Store"]
