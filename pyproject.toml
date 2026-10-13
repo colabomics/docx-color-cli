@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "docx-color-cli"
+version = "0.3.0"
+description = "Color accepted DOCX tracked insertions with optional direct PDF output"
+requires-python = ">=3.10"
+dependencies = ["lxml>=5"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+docx-color = "docx_color_cli.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/docx_color_cli"]
