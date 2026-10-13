@@ -1,9 +1,11 @@
 from collections import Counter
 
 import pytest
+from helpers.assertions import assert_segments, xml_part
+from helpers.fixtures import insert, p, run
 from lxml import etree
 
-from docx_color_cli.cli import W, modify
+from docx_color_cli.cli import W, main, modify
 
 
 def test_color_and_accept():
@@ -26,3 +28,21 @@ def test_structural_revisions_fail_closed():
     xml = f'''<w:document xmlns:w="{W[1:-1]}"><w:body><w:p><w:pPr><w:rPr><w:del/></w:rPr></w:pPr></w:p></w:body></w:document>'''
     with pytest.raises(ValueError, match="paragraph mark"):
         modify(etree.fromstring(xml), Counter())
+
+
+@pytest.mark.parametrize("position", ["before", "between", "after"])
+def test_options_can_surround_positional_paths(docx, tmp_path, capsys, position):
+    source = docx("source.docx", p(run("keep") + insert("new")))
+    original = source.read_bytes()
+    target = tmp_path / "explicit output.docx"
+    options = ["--inserted-color", "123456", "--unchanged-color", "654321"]
+    arguments = {
+        "before": [*options, str(source), str(target)],
+        "between": [str(source), *options, str(target)],
+        "after": [str(source), str(target), *options],
+    }[position]
+    main(arguments)
+    assert "Saved:" in capsys.readouterr().out
+    assert_segments(xml_part(target), [("keep", "654321"), ("new", "123456")])
+    assert source.read_bytes() == original
+    assert set(tmp_path.iterdir()) == {source, target}

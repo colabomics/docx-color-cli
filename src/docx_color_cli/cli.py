@@ -439,7 +439,8 @@ def main(argv=None):
         action="store_true",
         help="Validate conversion support without publishing output",
     )
-    args = parser.parse_args(argv)
+    # Keep options between input and optional output portable across Python versions.
+    args = parser.parse_intermixed_args(argv)
     if args.check and (args.output is not None or args.report is not None):
         parser.error("--check cannot be combined with output or --report")
     destination = args.output or args.input.with_name(args.input.stem + "_colored.docx")

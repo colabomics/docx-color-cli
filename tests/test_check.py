@@ -83,15 +83,21 @@ def test_check_invalid_input_exits_without_output(docx, tmp_path, case):
 
 
 @pytest.mark.parametrize("option", ["output", "report"])
-def test_check_rejects_publication_arguments(docx, tmp_path, capsys, option):
+@pytest.mark.parametrize("position", ["before", "between", "after"])
+def test_check_rejects_publication_arguments(docx, tmp_path, capsys, option, position):
     source = docx("source.docx", paragraph("keep"))
     args = (
         [str(tmp_path / "out.docx")]
         if option == "output"
         else ["--report", str(tmp_path / "report.json")]
     )
+    arguments = {
+        "before": ["--check", str(source), *args],
+        "between": [str(source), "--check", *args],
+        "after": [str(source), *args, "--check"],
+    }[position]
     with pytest.raises(SystemExit) as error:
-        cli.main([str(source), "--check", *args])
+        cli.main(arguments)
     assert error.value.code == 2
     assert "--check cannot be combined" in capsys.readouterr().err
     assert list(tmp_path.iterdir()) == [source]
