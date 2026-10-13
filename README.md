@@ -85,6 +85,12 @@ commands to use `--inserted-color` and `--unchanged-color`; the default colors a
 
 ## Example: a Nature-style manuscript
 
+![Animated workflow showing tracked edits, the conversion command and red-and-black output](assets/demo.gif)
+
+The animation combines actual CLI output with browser previews of the public
+synthetic DOCX. Typing and timing are staged for demonstration; it is not a
+Microsoft Word screen recording. Static previews are provided below.
+
 Try the included, four-page synthetic manuscript (approximately 1,450 words after acceptance). Its title, author block, bold
 summary, numbered citation, references, table and Methods follow an abridged
 structure inspired by [Nature's formatting guide](https://www.nature.com/nature/for-authors/formatting-guide).
@@ -181,7 +187,7 @@ The following cases are currently rejected or unsupported:
 - Comment cleanup with unresolved dependencies, including surviving threaded replies.
 
 A known run-property ordering defect remains when inserting color properties
-([audit](docs/code_audit.md), CF017). Internal checks cover ZIP/XML integrity,
+(CF017). Internal checks cover ZIP/XML integrity,
 relationships, fields, revision removal and retention invariants; they are not a
 complete OOXML schema validator or a rendering engine.
 
@@ -206,16 +212,12 @@ attempted conversion's statistics.
 
 ## Documentation and contributing
 
-Read [AGENTS.md](AGENTS.md) for development invariants and contribution guidance.
 Reproduce content defects with a minimal synthetic fixture and add a regression
 test before changing revision-processing behavior. Do not submit confidential
-documents as public issue attachments.
-
-- [Code audit and known issues](docs/code_audit.md)
-- [Test results and validation scope](docs/test_report.md)
-- [Repair plan](docs/fix_plan.md)
-- [File safety and P0 repairs](docs/p0_fix_report.md)
-- [Hyperlink semantic comparison](docs/hyperlink_h_report.md)
+documents as public issue attachments. Run `uv run pytest -v` from the checkout;
+known limitations use strict XFAIL markers, and private reference tests skip when
+their documents are unavailable. See [example details](examples/README.md) for
+public sample documents and preview limitations.
 
 ## License
 

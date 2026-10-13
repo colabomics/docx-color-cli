@@ -67,7 +67,7 @@ def test_academic_isolated_nested_paragraph_text_matches_word():
     assert checked > 0, 'No independently comparable nested paragraphs were found'
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason='CF019: strict reference differs in link representation and metadata; see final_content_cleanup_report.md')
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason='VAL001: strict reference differs in link representation and metadata; see docs/code_audit.md')
 def test_academic_complete_word_reference(tmp_path):
     source_hash = sha256(ORIGINAL.read_bytes()).digest()
     reference_hash = sha256(REFERENCE.read_bytes()).digest()
