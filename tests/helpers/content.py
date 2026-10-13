@@ -113,6 +113,36 @@ def field_issues(root):
     return issues
 
 
+def bookmark_issues(root):
+    """Validate each alternative separately; only one MC branch is displayed."""
+    branches = {'{http://schemas.openxmlformats.org/markup-compatibility/2006}' + n
+                for n in ('Choice', 'Fallback')}
+    issues = []
+    def check(container):
+        starts, ends = set(), set()
+        def walk(node):
+            if node is not container and node.tag in branches:
+                check(node)
+                return
+            if node.tag == W + 'bookmarkStart':
+                ident = node.get(W + 'id')
+                if ident is None or ident in starts:
+                    issues.append('unbalanced/duplicate bookmark range')
+                starts.add(ident)
+            elif node.tag == W + 'bookmarkEnd':
+                ident = node.get(W + 'id')
+                if ident not in starts or ident in ends:
+                    issues.append('unbalanced/duplicate bookmark range')
+                ends.add(ident)
+            for child in node:
+                walk(child)
+        walk(container)
+        if starts != ends:
+            issues.append('unbalanced/duplicate bookmark range')
+    check(root)
+    return issues
+
+
 class _Package:
     def __init__(self, path):
         with ZipFile(path) as archive:
@@ -313,10 +343,7 @@ class _Package:
             if name in self.stories:
                 issues.extend(f'{name}: {issue}' for issue in field_issues(root))
                 if accepted:
-                    starts = [n.get(W + 'id') for n in root.iter(W + 'bookmarkStart')]
-                    ends = [n.get(W + 'id') for n in root.iter(W + 'bookmarkEnd')]
-                    if None in starts + ends or sorted(starts) != sorted(ends) or len(starts) != len(set(starts)):
-                        issues.append(f'{name}: unbalanced/duplicate bookmark range')
+                    issues.extend(f'{name}: {issue}' for issue in bookmark_issues(root))
                 for fraction in root.iter(M + 'f'):
                     if fraction.find(M + 'num') is None or fraction.find(M + 'den') is None:
                         issues.append(f'{name}: incomplete OMML fraction')

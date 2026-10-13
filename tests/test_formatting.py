@@ -51,15 +51,16 @@ def test_CF015_historical_revision_not_current(docx, tmp_path):
     assert_integrity(target)
 
 
-@pytest.mark.xfail(strict=True, raises=(AssertionError, ValueError), reason='CF013: tblPrExChange is safely rejected; acceptance remains unsupported')
 def test_CF013_table_exception_history_removed(docx, tmp_path):
-    body = '<w:tbl><w:tr><w:tblPrEx><w:tblPrExChange w:id="1"><w:tblPrEx/></w:tblPrExChange></w:tblPrEx><w:tc>' + p(run('text')) + '</w:tc></w:tr></w:tbl>'
+    body = '<w:tbl><w:tr><w:tblPrEx><w:tblW w:w="2400" w:type="dxa"/><w:tblPrExChange w:id="1"><w:tblPrEx/></w:tblPrExChange></w:tblPrEx><w:tc>' + p(run('text')) + '</w:tc></w:tr></w:tbl>'
     target = tmp_path / 'out.docx'
     convert(docx('source.docx', body), target)
     assert not xml_part(target).findall('.//' + W + 'tblPrExChange')
+    assert xml_part(target).find('.//' + W + 'tblPrEx/' + W + 'tblW').get(W + 'w') == '2400'
+    assert_segments(xml_part(target), [('text', '000000')])
+    assert_integrity(target)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason='CF017: new color precedes fonts/bold in rPr schema order')
 def test_CF017_color_property_order(docx, tmp_path):
     target = tmp_path / 'out.docx'
     convert(docx('source.docx', p(run('text', '<w:rFonts w:ascii="Cambria"/><w:b/><w:sz w:val="24"/>'))), target)

@@ -44,6 +44,7 @@ def test_cli_errors(docx, tmp_path, case, message):
     result = subprocess.run([sys.executable, '-m', 'docx_color_cli.cli', str(source), str(target), *args], capture_output=True, text=True)
     assert result.returncode != 0
     assert message in result.stderr
+    assert "Traceback" not in result.stderr
     if original is not None:
         assert source.read_bytes() == original
     if target != source:
@@ -82,7 +83,7 @@ def test_ER011_docx_cli_defaults_and_report(docx, tmp_path, capsys, color_option
     assert 'Saved:' in capsys.readouterr().out
 
 
-@pytest.mark.parametrize('arguments', [['--format', 'docx'], ['--reference', 'reference.docx'], ['--strict-content'], ['--red', '0000FF'], ['--black', '112233']])
+@pytest.mark.parametrize('arguments', [['--format', 'docx'], ['--strict-content'], ['--red', '0000FF'], ['--black', '112233']])
 def test_ER012_only_existing_docx_cli_options(arguments, docx, tmp_path):
     source = docx('source.docx', paragraph('keep'))
     result = subprocess.run([sys.executable, '-m', 'docx_color_cli.cli', str(source), *arguments], capture_output=True, text=True)

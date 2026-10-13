@@ -6,7 +6,9 @@ from .revisions import RANGES, fail
 
 
 def accept_structure(root, stats):
-    """Plan all structural changes before applying any of them."""
+    """Accept cells, then plan row and paragraph changes before publication."""
+    from .tables import accept_cells, has_live_content, validate_grid
+    cell_tables = accept_cells(root, stats)
     removed_rows = []
     row_markers = []
     touched_tables = set()
@@ -20,10 +22,11 @@ def accept_structure(root, stats):
         table = row.getparent()
         if len(marks) != 1 or table.tag != W + 'tbl':
             fail(row, 'conflicting or wrapped table row revision')
-        # Insertion/deletion can change vertical merge restart ownership. Do not guess.
-        for cell in table.iter(W + 'tc'):
-            if any(n.tag in {W + 'vMerge', W + 'hMerge'} for n in cell.iter()):
-                fail(row, 'table row revision involving merged cells')
+        if marks[0].tag == W + 'ins':
+            for cell in row.findall(W + 'tc'):
+                merge = cell.find(W + 'tcPr/' + W + 'vMerge')
+                if merge is not None and merge.get(W + 'val', 'continue') == 'continue' and has_live_content(cell):
+                    fail(row, 'inserted continuation row has live content requiring Word evidence')
         row_markers.extend(marks)
         touched_tables.add(table)
         if marks[0].tag == W + 'del':
@@ -49,7 +52,7 @@ def accept_structure(root, stats):
             following = following.getnext()
         if following is None or following.tag != W + 'p':
             fail(paragraph, 'deleted paragraph mark has no adjacent paragraph in the same container')
-        if props.find(W + 'sectPr') is not None or following.find(W + 'pPr/' + W + 'sectPr') is not None:
+        if props.find(W + 'sectPr') is not None:
             fail(paragraph, 'paragraph mark deletion across section boundary')
         merges.append((paragraph, following))
 
@@ -75,3 +78,7 @@ def accept_structure(root, stats):
             # No remaining rows: the table itself has no final content.
             table.getparent().remove(table)
             stats['deleted_tables'] += 1
+
+    for table in touched_tables | cell_tables:
+        if table.getparent() is not None:
+            validate_grid(table)

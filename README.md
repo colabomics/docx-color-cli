@@ -7,8 +7,6 @@ font colors.
 unchanged text in black, and deleted content removed. It works directly with
 OOXML and keeps supported document structures and editable fields intact.
 
-**Python 3.11+ · DOCX → DOCX · Runtime dependency: lxml**
-
 The project is under active development. Content fidelity takes priority over
 formatting and performance. Supported revisions are accepted; unsupported or
 ambiguous structures cause an error before the output is published. Compatibility
@@ -36,8 +34,6 @@ Use an activated Python 3.11+ virtual environment:
 python -m pip install .
 docx-color --help
 ```
-
-Microsoft Word and LibreOffice are not required. PDF conversion is not supported.
 
 ## Quick start
 
@@ -80,47 +76,41 @@ The equivalent short options are `-ic` and `-uc`:
 docx-color manuscript.docx manuscript_colored.docx -ic 0000FF -uc 000000
 ```
 
-The color options replace the former `--red` and `--black` names. Update existing
-commands to use `--inserted-color` and `--unchanged-color`; the default colors are unchanged.
-
 ## Example:
-
-![Animated workflow showing tracked edits, the conversion command and red-and-black output](assets/demo.gif)
-
-The animation combines actual CLI output with browser previews of the public
-synthetic DOCX, ending with synchronized scrolling of the before/after documents
-side by side. Typing and timing are staged for demonstration; it is not a
-Microsoft Word screen recording. Static previews are provided below.
 
 Try the included, four-page synthetic manuscript (approximately 1,450 words after acceptance).
 
 Download the [tracked input](examples/tracked.docx) and
 [converted output](examples/colored.docx), or run from the checkout:
 
-```bash
-uv run docx-color examples/tracked.docx examples/colored.docx
-```
-
 Four fictional authors contribute **124 revision markers: 73 insertions and 51
 deletions** across the title, summary, results, discussion, Methods and table.
 The converted document preserves two equations and editable citation/hyperlink fields.
 
-| Before: tracked revisions | After: accepted and colored |
-| --- | --- |
-| ![Input manuscript with inserted text underlined and deleted text struck through](assets/nature-before.png) | ![Converted manuscript with inserted text red, unchanged text black and deleted text removed](assets/nature-after.png) |
+```bash
+uv run docx-color examples/tracked.docx examples/colored.docx
+```
 
-Screenshots show the actual DOCX files' first pages rendered in a browser with
-[docx-preview](https://github.com/VolodymyrBaydalka/docxjs). They are **not Microsoft
-Word screenshots** or evidence of identical Word layout. The input preview uses
-distinct colors for each author, underlined insertions and struck-through deletions;
-author names are read from the DOCX revision metadata. Output colors come from
-the converted DOCX. See [example details](examples/README.md).
+![Animated workflow showing tracked edits, the conversion command and red-and-black output](assets/demo.gif)
+
+To compare against a separate DOCX manually saved after **Accept All Changes** in
+Microsoft Word, enable reference validation:
+
+```bash
+docx-color manuscript.docx manuscript_colored.docx --reference accepted_in_word.docx
+```
+
+Any comparison failure prevents publication and preserves an existing output.
+Comparison checks logical text, structure, editable fields, equations and linked
+resources, ignoring font colors and equivalent run splitting. It is conservative:
+Word re-save differences can also cause a rejection. It does not verify the
+reference's provenance or identical page layout. No Word automation is used.
 
 ## Command-line reference
 
 ```text
 docx-color [-h] [--inserted-color RGB] [--unchanged-color RGB] [--report REPORT]
-           [--no-strict] input [output]
+           [--reference REFERENCE] [--no-strict] input [output]
 ```
 
 | Argument | Description | Default |
@@ -129,6 +119,7 @@ docx-color [-h] [--inserted-color RGB] [--unchanged-color RGB] [--report REPORT]
 | `output` | Destination DOCX | `<input_stem>_colored.docx` |
 | `-ic`, `--inserted-color` | Color for inserted text, as six hexadecimal digits without `#` | `FF0000` |
 | `-uc`, `--unchanged-color` | Color for unchanged text, in the same format | `000000` |
+| `--reference` | Word-accepted DOCX; mismatches block output publication | No external comparison |
 | `--report` | Path for a JSON conversion-statistics report | No report file |
 | `--no-strict` | Legacy compatibility option; does **not** bypass safety checks | Disabled |
 | `-h`, `--help` | Show command help | — |
@@ -146,18 +137,28 @@ of equivalence with Microsoft Word.
   the merged paragraph's properties.
 - Paired inline, whole-paragraph and cross-paragraph moves within the same document
   part, subject to structural boundary checks.
-- Text changes within table cells and ordinary table-row insertions and deletions.
-  Inserted rows use text-level revision markers to determine text color.
-- Supported mathematical run revisions, nested run revisions, inserted equation
-  controls and fully deleted equation objects. Partially retained objects are
+- Text and supported structural changes in tables: cell insertions, cell deletions
+  consistent with the explicit final grid, explicit vertical merge-state changes,
+  and row edits with valid surviving merge ownership. Row/cell insertion marks
+  do not recolor unchanged text without a text-level insertion revision.
+- Mathematical run revisions, including supported mixed-stream splitting and
+  inherited properties, nested revisions, inserted equation controls and fully
+  deleted equation objects. Partially retained objects are
   never discarded merely because their control is marked deleted.
 - Supported formatting revisions, retaining current properties and removing
-  historical snapshots.
+  historical snapshots, including `tblPrExChange`.
+- Shared Strict/Transitional OOXML revision vocabulary, preserving each XML part's
+  namespace dialect; no general Strict-to-Transitional format conversion.
+- Revisions within independently processable AlternateContent alternatives, keeping
+  both Choice and Fallback; complete custom XML/content-control markup ranges.
 
 The converter preserves supported hyperlinks, bookmarks, images, OMML equations,
 content controls, headers, footers, footnotes and endnotes. Word fields, cross-references
 and Zotero citation/bibliography fields remain editable rather than being flattened
-into plain text. Fields are preserved, not recalculated.
+into plain text. Fields are preserved, not recalculated. Literal REF/PAGEREF/NOTEREF
+and internal hyperlink dependencies are checked for newly missing or ambiguous
+bookmark targets. Existing broken references are preserved, not repaired. Dynamic
+or conditional reference changes that cannot be resolved safely are rejected.
 
 Images proven unused after revision acceptance are cleaned up without recompressing
 retained images. Equation containers made empty by accepted deletions and comments
@@ -171,31 +172,36 @@ compatibility has not been established.
 
 The following cases are currently rejected or unsupported:
 
-- Strict OOXML documents and unknown revision types.
-- Unpaired moves, nested move containers, moves across cells or document parts,
-  and move ranges that share moved content.
-- Paragraph merges across sections, cells or tables, and unsupported terminal
-  deleted paragraph marks.
-- Cell insertion/deletion/merge revisions, row revisions involving vertical or
-  legacy horizontal cell merges, and table-property exception revisions
-  (`tblPrExChange`).
-- Custom XML revision ranges, unsupported or conflicting math revisions, and
-  equation-control deletions with retained or unrecognized content.
+- Unknown revision types, mixed namespace dialects within a part, and unsupported
+  extension semantics.
+- Unpaired moves, moves nested inside other moves, cross-cell/part moves, and
+  ranges sharing moved content. Moves nested inside ordinary insertions/deletions
+  are supported.
+- Deleting section boundaries, merging across cells/tables, and unsupported
+  terminal paragraph-mark deletions. Merging into a paragraph that retains its
+  section boundary is supported.
+- Cell deletions requiring inferred horizontal span/grid repair; vertical merge
+  edits requiring ownership transfer or reconciliation of live continuation content.
+- Partial/overlapping custom XML tag ranges, custom XML move ranges, cross-branch
+  fields/ranges, conflicting math properties and equation-control deletions with
+  retained or unrecognized arguments.
 - Comment cleanup with unresolved dependencies, including surviving threaded replies.
 
-A known run-property ordering defect remains when inserting color properties
-(CF017). Internal checks cover ZIP/XML integrity,
-relationships, fields, revision removal and retention invariants; they are not a
-complete OOXML schema validator or a rendering engine.
+Internal checks cover ZIP/XML integrity, relationships, field boundaries, supported
+math argument cardinalities, table grids, revision removal and retention invariants.
+They are not a complete OOXML schema validator or a rendering engine.
 
-Independent Word-reference comparison is available in the test suite, not as a
-CLI validation mode. Bounded semantic comparison of the local academic sample's
-body passes; strict full comparison still detects representation and metadata
-differences. This is evidence for the tested sample, not a guarantee for all documents.
+The independent comparator is also available as
+`docx_color_cli.validation.validate_docx(output, reference)`. Its optional
+`semantic=True` comparison recognizes a small, tested set of representation
+alternatives and reports each normalization; the CLI uses the conservative default.
+The private academic sample's body passes bounded semantic comparison, while full
+comparison still detects font-signature differences. These remain deliberately
+unignored. This is evidence for the tested sample, not a guarantee for all documents.
 
 ## File safety
 
-The input document is preserved. Input, output and report paths must identify
+The input document is preserved. Input, output, reference and report paths must identify
 different files; checks include resolved paths, symbolic links and existing hard
 links.
 
@@ -206,15 +212,6 @@ atomic replacement. Conversion or validation failure preserves an existing outpu
 The optional report is published before the DOCX. These are separate atomic
 operations: if final DOCX publication fails, the report may already contain the
 attempted conversion's statistics.
-
-## Documentation and contributing
-
-Reproduce content defects with a minimal synthetic fixture and add a regression
-test before changing revision-processing behavior. Do not submit confidential
-documents as public issue attachments. Run `uv run pytest -v` from the checkout;
-known limitations use strict XFAIL markers, and private reference tests skip when
-their documents are unavailable. See [example details](examples/README.md) for
-public sample documents and preview limitations.
 
 ## License
 

@@ -34,9 +34,8 @@ def read_xml_parts(archive):
                 raise ValueError(f'{name}: XMLSyntaxError: {exc}') from exc
             if root.getroottree().docinfo.doctype:
                 raise ValueError(f'{name}: DTD is unsupported')
-            for node in root.iter():
-                if isinstance(node.tag, str) and etree.QName(node).namespace == 'http://purl.oclc.org/ooxml/wordprocessingml/main':
-                    raise ValueError(f'{name}: Strict OOXML namespace is unsupported')
+            from .namespaces import canonical_namespaces
+            root = canonical_namespaces(root)
             roots[name] = root
     if roots['word/document.xml'].tag != W + 'document':
         raise ValueError('word/document.xml: expected Word document root')
@@ -169,6 +168,11 @@ def validate_package(archive, roots, *, accepted=False):
 def validate_story(root, name):
     """Validate retained fields and ranges in each independent text story."""
     containers = {W + n for n in ('body', 'hdr', 'ftr', 'footnote', 'endnote', 'comment', 'txbxContent', 'docPartBody', 'fldSimple')}
+    from .compatibility import BRANCHES
+    from .math_revisions import OBJECTS
+    from .revisions import M
+    from .tables import validate_grid
+    containers |= BRANCHES
     def check(container):
         stack = []
         starts, ends = {}, set()
@@ -202,6 +206,15 @@ def validate_story(root, name):
                 ns = '{http://schemas.openxmlformats.org/officeDocument/2006/math}'
                 if len(node.findall(ns + 'num')) != 1 or len(node.findall(ns + 'den')) != 1:
                     raise ValueError(f'{name}: incomplete mathematical fraction')
+            if node.tag.startswith(M) and etree.QName(node).localname in OBJECTS:
+                kind = etree.QName(node).localname
+                for argument in OBJECTS[kind]:
+                    count = len(node.findall(M + argument))
+                    repeatable = kind in {'d', 'eqArr', 'm'}
+                    if count == 0 or not repeatable and count != 1:
+                        raise ValueError(f'{name}: malformed OMML {kind}/{argument} cardinality')
+            if node.tag == W + 'tbl':
+                validate_grid(node)
             if node.tag == W + 'tc' and node.find(W + 'p') is None and node.find(W + 'sdt') is None:
                 raise ValueError(f'{name}: table cell has no paragraph')
             for child in node:
@@ -223,7 +236,13 @@ ignores paragraph and row boundaries (checked separately), and is NOT a referenc
 DOCX comparison or an independent implementation of Word revision semantics.
 """
     from .revisions import HISTORY
+    from .tables import deleted_cell, deleted_row
     from .math_revisions import deleted_objects, emptied_containers
+    from .math_runs import mixed, split_mixed_runs
+    if any(mixed(n) for n in root.iter('{http://schemas.openxmlformats.org/officeDocument/2006/math}r')):
+        from copy import deepcopy
+        root = deepcopy(root)
+        split_mixed_runs(root)
     removed_math = deleted_objects(root)
     removed_math |= emptied_containers(root, removed_math)
 
@@ -239,7 +258,9 @@ DOCX comparison or an independent implementation of Word revision semantics.
             return
         if node.tag in {W + n for n in HISTORY | {'del', 'moveFrom', 'delText', 'delInstrText'}}:
             return
-        if node.tag == W + 'tr' and node.find(W + 'trPr/' + W + 'del') is not None:
+        if node.tag == W + 'tc' and deleted_cell(node):
+            return
+        if node.tag == W + 'tr' and deleted_row(node):
             return
         if node.tag == math + 'r':
             # Only a chain of whole-run edits can delete the run itself. A
@@ -260,16 +281,19 @@ DOCX comparison or an independent implementation of Word revision semantics.
 def retained_structure(root):
     """Count retained blocks before paragraph merging, independent of node moves."""
     from .revisions import HISTORY
+    from .tables import deleted_cell, deleted_row
 
     counts = Counter()
     def visit(node):
         if not isinstance(node.tag, str) or node.tag in {W + n for n in HISTORY | {'del', 'moveFrom'}}:
             return
-        if node.tag == W + 'tr' and node.find(W + 'trPr/' + W + 'del') is not None:
+        if node.tag == W + 'tc' and deleted_cell(node):
+            return
+        if node.tag == W + 'tr' and deleted_row(node):
             return
         if node.tag == W + 'tbl':
             rows = node.findall(W + 'tr')
-            if rows and all(r.find(W + 'trPr/' + W + 'del') is not None for r in rows):
+            if rows and all(deleted_row(r) for r in rows):
                 return
         if node.tag in {W + n for n in ('p', 'tbl', 'tr', 'tc')}:
             counts[etree.QName(node).localname] += 1

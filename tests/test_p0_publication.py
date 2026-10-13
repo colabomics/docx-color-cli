@@ -50,11 +50,9 @@ def test_P0_validate_temporary_package_before_publication(docx, tmp_path, monkey
     assert sorted(f.name for f in tmp_path.iterdir()) == ['out.docx', 'source.docx']
 
 
-@pytest.mark.parametrize('marker', ['cellIns', 'cellDel', 'cellMerge', 'tblPrExChange'])
+@pytest.mark.parametrize('marker', ['cellIns', 'cellDel', 'cellMerge'])
 def test_P0_no_strict_cannot_publish_unsupported_table_revision(docx, tmp_path, marker):
-    body = '<w:tbl><w:tr><w:tc><w:tcPr><w:' + marker + ' w:id="1"/></w:tcPr>' + paragraph('keep') + '</w:tc></w:tr></w:tbl>'
-    if marker == 'tblPrExChange':
-        body = '<w:tbl><w:tr><w:tblPrEx><w:tblPrExChange w:id="1"><w:tblPrEx/></w:tblPrExChange></w:tblPrEx><w:tc>' + paragraph('keep') + '</w:tc></w:tr></w:tbl>'
+    body = '<w:tbl><w:tr><w:tc><w:tcPr><w:' + marker + ' w:id="1"><w:unknown/></w:' + marker + '></w:tcPr>' + paragraph('keep') + '</w:tc></w:tr></w:tbl>'
     assert_rejects_without_output(cli.convert, docx('source.docx', body), tmp_path / 'out.docx', strict=False)
 
 

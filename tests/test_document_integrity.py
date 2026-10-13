@@ -47,16 +47,9 @@ def test_CF001_report_cannot_overwrite_document(docx, tmp_path, report_target):
         assert_integrity(target)
 
 
-@pytest.mark.parametrize('invalid', ['strict-namespace','wrong-root'])
-def test_CF004_document_namespace_or_root(docx, tmp_path, invalid):
+def test_CF004_wrong_document_root_rejected(docx, tmp_path):
     source = docx('source.docx', p(delete('gone') + insert('keep')))
-    with ZipFile(source) as archive:
-        xml = archive.read('word/document.xml')
-    if invalid == 'strict-namespace':
-        xml = xml.replace(W_NS.encode(), b'http://purl.oclc.org/ooxml/wordprocessingml/main')
-    else:
-        xml = b'<not-a-word-document/>'
-    rewrite(source, {'word/document.xml': xml})
+    rewrite(source, {'word/document.xml': b'<not-a-word-document/>'})
     assert_rejects_without_output(convert, source, tmp_path / 'out.docx')
 
 

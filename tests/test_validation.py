@@ -4,9 +4,18 @@ from helpers.fixtures import W_NS as W, R_NS as R
 from helpers.fixtures import paragraph, run
 
 
+@pytest.fixture(autouse=True, params=['helper', 'production'])
+def validator_implementation(request, monkeypatch):
+    import sys
+    if request.param == 'helper':
+        from helpers.content import validate_docx
+    else:
+        from docx_color_cli.validation import validate_docx
+    monkeypatch.setattr(sys.modules[__name__], 'validate', validate_docx)
+
+
 def validate(output, reference):
-    from helpers.content import validate_docx
-    return validate_docx(output, reference)
+    raise AssertionError('validator fixture must select implementation')
 
 
 @pytest.mark.parametrize('actual,expected', [

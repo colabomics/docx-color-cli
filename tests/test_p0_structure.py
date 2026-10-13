@@ -69,9 +69,16 @@ def test_CF003_delete_rows_and_retain_editable_objects(docx, tmp_path, strict):
 
 
 @pytest.mark.parametrize('mark', ['ins', 'del'])
-def test_CF003_vertical_merge_row_revision_refused(docx, tmp_path, mark):
+def test_CF003_vertical_merge_row_revision(docx, tmp_path, mark):
     body = '<w:tbl>' + row(run('A'), '', '<w:vMerge w:val="restart"/>') + row(run('B'), f'<w:{mark} w:id="1"/>', '<w:vMerge/>') + '</w:tbl>'
-    assert_rejects_without_output(convert, docx('source.docx', body), tmp_path / 'out.docx', strict=False)
+    if mark == 'ins':
+        assert_rejects_without_output(convert, docx('source.docx', body), tmp_path / 'out.docx', strict=False)
+    else:
+        target = tmp_path / 'out.docx'
+        convert(docx('source.docx', body), target)
+        assert_segments(xml_part(target), [('A', '000000')])
+        assert len(list(xml_part(target).iter(W + 'tr'))) == 1
+        assert_integrity(target)
 
 
 def test_CF002_cell_and_header_paragraph_merge(docx, tmp_path):

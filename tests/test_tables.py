@@ -50,18 +50,20 @@ def test_CF003_deleted_row_removed(docx, tmp_path):
 
 
 @pytest.mark.parametrize('tag', ['cellIns', 'cellDel', 'cellMerge'])
-def test_TB005_cell_structural_revision_rejected(docx, tmp_path, tag):
+def test_TB005_conflicting_cell_revision_rejected(docx, tmp_path, tag):
     with pytest.raises(ValueError, match=tag):
-        convert(docx('source.docx', table(run('cell'), cell_props=f'<w:{tag} w:id="1"/>')), tmp_path / 'out.docx')
+        convert(docx('source.docx', table(run('cell'), cell_props=f'<w:{tag} w:id="1"/><w:{tag} w:id="2"/>')), tmp_path / 'out.docx')
     assert not (tmp_path / 'out.docx').exists()
 
 
-@pytest.mark.xfail(strict=True, raises=(AssertionError, ValueError), reason='CF012: cell revisions are safely rejected; acceptance remains unsupported')
 @pytest.mark.parametrize('tag', ['cellIns', 'cellDel', 'cellMerge'])
 def test_CF012_cell_revisions_fully_accepted(docx, tmp_path, tag):
     target = tmp_path / 'out.docx'
     convert(docx('source.docx', table(run('cell'), cell_props=f'<w:{tag} w:id="1"/>')), target, strict=False)
     assert not xml_part(target).findall('.//' + W + tag)
+    assert_segments(xml_part(target), [] if tag == 'cellDel' else [('cell', '000000')])
+    assert len(list(xml_part(target).iter(W + 'tc'))) == (0 if tag == 'cellDel' else 1)
+    assert_integrity(target)
 
 
 def test_TB006_cross_cell_replacement_preserves_boundaries(docx, tmp_path):

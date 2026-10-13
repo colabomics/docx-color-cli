@@ -38,7 +38,6 @@ def test_word_math_run_revision(docx, tmp_path, location, inserted):
 
 
 @pytest.mark.parametrize('content', [
-    '<m:t>old</m:t>' + revision('ins', '<m:t>new</m:t>'),
     revision('ins', '<m:f><m:num/><m:den/></m:f>'),
     '<w:rPr><w:b/></w:rPr>' + revision('ins', '<w:rPr><w:i/></w:rPr><m:t>x</m:t>'),
 ])

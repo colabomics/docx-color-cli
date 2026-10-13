@@ -8,7 +8,10 @@ from lxml import etree
 from .revisions import W, M, active_nodes, fail
 
 OBJECTS = {'d': {'e'}, 'f': {'num', 'den'}, 'sSub': {'e', 'sub'},
-           'sSup': {'e', 'sup'}, 'nary': {'sub', 'sup', 'e'}, 'func': {'fName', 'e'}, 'eqArr': {'e'}}
+           'sSup': {'e', 'sup'}, 'nary': {'sub', 'sup', 'e'}, 'func': {'fName', 'e'}, 'eqArr': {'e'},
+           'acc': {'e'}, 'bar': {'e'}, 'borderBox': {'e'}, 'box': {'e'}, 'groupChr': {'e'},
+           'limLow': {'e', 'lim'}, 'limUpp': {'e', 'lim'}, 'phant': {'e'}, 'rad': {'deg', 'e'},
+           'sPre': {'e', 'sub', 'sup'}, 'sSubSup': {'e', 'sub', 'sup'}, 'm': {'mr'}}
 
 
 def fully_deleted(node):
@@ -34,7 +37,10 @@ def fully_deleted(node):
             return False
     def empty_argument(arg):
         for child in arg:
-            if child.tag == M + 'r':
+            if arg.tag == M + 'mr' and child.tag == M + 'e':
+                if not empty_argument(child):
+                    return False
+            elif child.tag == M + 'r':
                 payload = next((c for c in child if c.tag in {W + 'ins', W + 'del'}), None)
                 if payload is None or any(c is not payload and c.tag not in {W + 'rPr', M + 'rPr'} for c in child):
                     return False

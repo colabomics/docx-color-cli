@@ -9,7 +9,7 @@ from helpers.fixtures import paragraph
 
 @pytest.mark.parametrize('alias', ['relative', 'symlink', 'hardlink'])
 @pytest.mark.parametrize('collision', ['output-input', 'report-input', 'report-output'])
-def test_CF001_path_aliases(docx, tmp_path, monkeypatch, alias, collision):
+def test_CF001_path_aliases(docx, tmp_path, monkeypatch, alias, collision, capsys):
     source = docx('source.docx', paragraph('original'))
     target = docx('out.docx', paragraph('previous output'))
     victim = target if collision == 'report-output' else source
@@ -22,15 +22,18 @@ def test_CF001_path_aliases(docx, tmp_path, monkeypatch, alias, collision):
         monkeypatch.chdir(tmp_path)
         link = Path(victim.name)
     before = source.read_bytes(), target.read_bytes()
-    with pytest.raises(ValueError, match='paths must differ'):
-        if collision == 'output-input':
+    if collision == 'output-input':
+        with pytest.raises(ValueError, match='paths must differ'):
             convert(source, link)
-        else:
+    else:
+        with pytest.raises(SystemExit) as error:
             main([str(source), str(target), '--report', str(link)])
+        assert error.value.code == 1
+        assert 'paths must differ' in capsys.readouterr().err
     assert (source.read_bytes(), target.read_bytes()) == before
 
 
-def test_CF001_report_failure_preserves_existing_output(docx, tmp_path, monkeypatch):
+def test_CF001_report_failure_preserves_existing_output(docx, tmp_path, monkeypatch, capsys):
     source = docx('source.docx', paragraph('original'))
     target = docx('out.docx', paragraph('previous output'))
     report = tmp_path / 'report.json'
@@ -41,7 +44,9 @@ def test_CF001_report_failure_preserves_existing_output(docx, tmp_path, monkeypa
             raise PermissionError('report publication failed')
         return replace(self, destination)
     monkeypatch.setattr(Path, 'replace', fail_report)
-    with pytest.raises(PermissionError, match='report publication'):
+    with pytest.raises(SystemExit) as error:
         main([str(source), str(target), '--report', str(report)])
+    assert error.value.code == 1
+    assert 'report publication' in capsys.readouterr().err
     assert (source.read_bytes(), target.read_bytes()) == before
     assert sorted(p.name for p in tmp_path.iterdir()) == ['out.docx', 'source.docx']

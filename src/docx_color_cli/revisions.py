@@ -8,7 +8,7 @@ from lxml import etree
 from .package import W, W_NS
 
 HISTORY = {'rPrChange', 'pPrChange', 'tblPrChange', 'trPrChange', 'tcPrChange',
-           'sectPrChange', 'tblGridChange', 'numberingChange'}
+           'sectPrChange', 'tblGridChange', 'tblPrExChange', 'numberingChange'}
 EDIT = {'ins', 'del', 'moveFrom', 'moveTo'}
 RANGES = {kind + 'Range' + end for kind in ('moveFrom', 'moveTo') for end in ('Start', 'End')}
 M = '{http://schemas.openxmlformats.org/officeDocument/2006/math}'
@@ -37,7 +37,10 @@ def fail(node, message):
 
 
 def scope(node):
+    from .compatibility import BRANCHES
     for parent in node.iterancestors():
+        if parent.tag in BRANCHES:
+            return parent
         if parent.tag in {W + name for name in ('body', 'hdr', 'ftr', 'footnote', 'endnote', 'comment', 'txbxContent', 'docPartBody')}:
             return parent
     return node.getroottree().getroot()
@@ -113,6 +116,10 @@ def check_moves(nodes):
 
 def preflight(root):
     from .math_revisions import deleted_objects, inserted_controls
+    from .custom_xml import MARKERS as CUSTOM_MARKERS, plan
+    plan(root)
+    from .compatibility import validate_alternatives
+    validate_alternatives(root)
     accepted_controls = set(inserted_controls(root))
     removed_math = deleted_objects(root)
     nodes = list(active_nodes(root))
@@ -120,8 +127,14 @@ def preflight(root):
         if not is_revision(node):
             continue
         name = etree.QName(node).localname
-        if node.tag not in {W + n for n in EDIT | HISTORY | RANGES | {'delText', 'delInstrText'}}:
+        if node.tag in {W + n for n in CUSTOM_MARKERS}:
+            continue
+        if node.tag not in {W + n for n in EDIT | HISTORY | RANGES | {'cellIns', 'cellDel', 'cellMerge', 'delText', 'delInstrText'}}:
             fail(node, name)
+        if name in {'cellIns', 'cellDel', 'cellMerge'}:
+            from .tables import check_marker
+            check_marker(node)
+            continue
         if name in HISTORY:
             # History is valid only on the corresponding current property container.
             expected = 'numPr' if name == 'numberingChange' else name[:-6]
@@ -129,14 +142,12 @@ def preflight(root):
                 fail(node, 'misplaced historical ' + name)
             continue
         ancestors = list(node.iterancestors())
-        if any(a.tag == '{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent' for a in ancestors):
-            fail(node, 'revision in AlternateContent requires branch-aware processing')
         if any(a.tag == M + 'ctrlPr' for a in ancestors):
             if any(a in removed_math or a in accepted_controls for a in ancestors):
                 continue
             fail(node, 'mathematical control revision')
         if name in EDIT:
-            if name in {'moveFrom', 'moveTo'} and any(a.tag in {W + n for n in EDIT} for a in ancestors):
+            if name in {'moveFrom', 'moveTo'} and any(a.tag in {W + 'moveFrom', W + 'moveTo'} for a in ancestors):
                 fail(node, 'nested move containers')
             parent = node.getparent()
             paragraph_mark = (parent is not None and parent.tag == W + 'rPr' and parent.getparent() is not None and parent.getparent().tag == W + 'pPr' and parent.getparent().getparent() is not None and parent.getparent().getparent().tag == W + 'p')
@@ -146,8 +157,12 @@ def preflight(root):
                     fail(node, 'structural revision marker must be empty')
                 continue  # Structural policy is checked before mutation in the converter.
             if name in {'ins', 'del'} and parent is not None and parent.tag == M + 'r':
+                from .math_runs import mixed, segments
+                if mixed(parent):
+                    segments(parent)
+                    continue
                 # Word extension: a whole math run's payload is inside w:ins/w:del.
-                # Mixed streams need run splitting and property inheritance; do not guess.
+                # Mixed streams were validated above; this path handles whole runs.
                 if any(c is not node and c.tag not in {M + 'rPr', W + 'rPr'} for c in parent):
                     fail(node, 'mixed math run revision requires splitting')
                 payload = node
@@ -162,6 +177,9 @@ def preflight(root):
                 if len(parent.findall(M + 'rPr')) + len(payload.findall(M + 'rPr')) > 1 or len(parent.findall(W + 'rPr')) + len(payload.findall(W + 'rPr')) > 1:
                     fail(node, 'ambiguous math run properties')
                 continue
+            from .compatibility import BRANCHES
+            if parent is not None and parent.tag in BRANCHES:
+                parent = parent.getparent().getparent()
             math_runs = (name in {'ins', 'del'} and parent is not None and parent.tag in {M + n for n in ('oMath', 'num', 'den', 'e', 'deg', 'sub', 'sup', 'lim', 'fName')} and all(c.tag == M + 'r' for c in node))
             if not math_runs and (parent is None or parent.tag not in {W + n for n in ('p', 'hyperlink', 'fldSimple', 'sdtContent', 'smartTag', 'customXml', 'dir', 'bdo', 'ins', 'del', 'moveFrom', 'moveTo')}):
                 fail(node, 'unsupported content revision context')

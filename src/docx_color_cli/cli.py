@@ -11,7 +11,7 @@ from collections import Counter
 from copy import copy
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from zipfile import ZipFile
+from zipfile import BadZipFile, ZipFile
 
 from lxml import etree
 
@@ -20,6 +20,7 @@ from .revisions import preflight, HISTORY, active_nodes, M
 from .structure import accept_structure
 from .resources import explicit_references, prune_images
 from .comments import reference_ids, prune_comments
+from .references import dependencies, validate_dependencies
 
 NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 W = '{' + NS + '}'
@@ -38,7 +39,11 @@ def paint_run(run, rgb):
     color = props.find(W + 'color')
     if color is None:
         color = etree.Element(W + 'color')
-        props.insert(0, color)
+        predecessors = {W + n for n in ('rStyle', 'rFonts', 'b', 'bCs', 'i', 'iCs',
+                         'caps', 'smallCaps', 'strike', 'dStrike', 'outline', 'shadow',
+                         'emboss', 'imprint', 'noProof', 'snapToGrid', 'vanish', 'webHidden')}
+        at = max((i + 1 for i, child in enumerate(props) if child.tag in predecessors), default=0)
+        props.insert(at, color)
     color.set(W + 'val', rgb.upper())
     for key in ('themeColor', 'themeTint', 'themeShade'):
         color.attrib.pop(W + key, None)
@@ -51,6 +56,10 @@ def _has_ancestor(node, tags):
 def modify(root, stats, original='000000', added='FF0000', strict=True):
     """Modify one Word XML part in place; abort on unhandled structural revisions."""
     preflight(root)
+    from .math_runs import split_mixed_runs
+    split_mixed_runs(root, stats)
+    from .custom_xml import accept as accept_custom_xml
+    accept_custom_xml(root, stats)
     from .math_revisions import deleted_objects, emptied_containers
     removed_math = deleted_objects(root)
     empty_math = emptied_containers(root, removed_math)
@@ -155,12 +164,12 @@ def check_paths(*paths):
     """Reject aliases, including existing hard links, before opening any output."""
     for a, b in combinations([Path(p) for p in paths if p is not None], 2):
         if a.resolve() == b.resolve() or (a.exists() and b.exists() and a.samefile(b)):
-            raise ValueError('Input, output and report paths must differ')
+            raise ValueError('Input, output, reference and report paths must differ')
 
 
-def convert(source, target, *, strict=True, black='000000', red='FF0000', _report=None):
+def convert(source, target, *, strict=True, black='000000', red='FF0000', _report=None, reference=None):
     source, target = Path(source), Path(target)
-    check_paths(source, target, _report)
+    check_paths(source, target, _report, reference)
     if not source.is_file():
         raise FileNotFoundError(source)
     if not all(re.fullmatch('[0-9A-Fa-f]{6}', x) for x in (black, red)):
@@ -170,8 +179,11 @@ def convert(source, target, *, strict=True, black='000000', red='FF0000', _repor
     with ZipFile(source) as zin:
         replacements = {}
         roots = read_xml_parts(zin)
+        from .namespaces import dialect, remap
+        dialects = {name: dialect(etree.fromstring(zin.read(name), etree.XMLParser(resolve_entities=False, no_network=True))) for name in roots}
         validate_package(zin, roots)
         stories = discover_stories(roots)
+        before_dependencies = dependencies(roots)
         before_comments = reference_ids(roots)
         before_references = {name: explicit_references(xml) for name, xml in stories.items()}
         for name, xml in stories.items():
@@ -188,10 +200,15 @@ def convert(source, target, *, strict=True, black='000000', red='FF0000', _repor
             stats['processed_parts'] += 1
         removed_comments, comment_changes = prune_comments(roots, set(zin.namelist()), before_comments, stats)
         replacements.update(comment_changes)
+        validate_dependencies(before_dependencies, roots)
         removed_parts, resource_changes = prune_images(roots, set(zin.namelist()) - removed_comments, before_references, stats)
         replacements.update(resource_changes)
         stats['removed_media_bytes'] = sum(zin.getinfo(name).file_size for name in removed_parts)
         removed_parts |= removed_comments
+        for name, data in list(replacements.items()):
+            if dialects.get(name):
+                restored = remap(etree.fromstring(data), dialects[name])
+                replacements[name] = etree.tostring(restored, encoding='UTF-8', xml_declaration=True, standalone=True)
         # Stage beside the destination; publish only after all DOCX checks succeed.
         with NamedTemporaryFile(dir=target.parent, suffix='.docx', delete=False) as f:
             temp = Path(f.name)
@@ -211,13 +228,17 @@ def convert(source, target, *, strict=True, black='000000', red='FF0000', _repor
                 for name in check.namelist():
                     if check.read(name) != replacements.get(name, zin.read(name)):
                         raise ValueError(f'{name}: unexpected output payload change')
+            if reference is not None:
+                from .validation import validate_docx
+                validate_docx(temp, reference).require()
+                stats['reference_validated'] = 1
             if _report is not None:
                 _report = Path(_report)
                 _report.parent.mkdir(parents=True, exist_ok=True)
                 with NamedTemporaryFile(dir=_report.parent, suffix='.json', delete=False) as f:
                     report_temp = Path(f.name)
                 report_temp.write_text(json.dumps(dict(stats), indent=2, ensure_ascii=False), encoding='utf-8')
-            check_paths(source, target, _report)
+            check_paths(source, target, _report, reference)
             if report_temp is not None:
                 report_temp.replace(_report)
             temp.replace(target)
@@ -228,11 +249,11 @@ def convert(source, target, *, strict=True, black='000000', red='FF0000', _repor
     return dict(stats)
 
 
-def convert_output(source, target, *, strict=True, black='000000', red='FF0000'):
+def convert_output(source, target, *, strict=True, black='000000', red='FF0000', reference=None):
     """Write a color-coded DOCX; no other output format is supported."""
     if Path(target).suffix.lower() != '.docx':
         raise ValueError('Output must end in .docx')
-    return convert(source, target, strict=strict, black=black, red=red)
+    return convert(source, target, strict=strict, black=black, red=red, reference=reference)
 
 
 def main(argv=None):
@@ -241,13 +262,17 @@ def main(argv=None):
     parser.add_argument('output', nargs='?', type=Path)
     parser.add_argument('-ic', '--inserted-color', metavar='RGB', default='FF0000', help='Inserted text color: six hexadecimal digits (default: FF0000)')
     parser.add_argument('-uc', '--unchanged-color', metavar='RGB', default='000000', help='Unchanged text color: six hexadecimal digits (default: 000000)')
+    parser.add_argument('--reference', type=Path, help='Compare with a Word-accepted DOCX; any mismatch prevents publication')
     parser.add_argument('--report', type=Path, help='Write JSON summary')
     parser.add_argument('--no-strict', action='store_true', help='Legacy option; unsupported revisions are still rejected')
     args = parser.parse_args(argv)
     destination = args.output or args.input.with_name(args.input.stem + '_colored.docx')
     if destination.suffix.lower() != '.docx':
         parser.error('Output must be a .docx file')
-    stats = convert(args.input, destination, strict=not args.no_strict, black=args.unchanged_color, red=args.inserted_color, _report=args.report)
+    try:
+        stats = convert(args.input, destination, strict=not args.no_strict, black=args.unchanged_color, red=args.inserted_color, _report=args.report, reference=args.reference)
+    except (OSError, BadZipFile, etree.XMLSyntaxError, ValueError) as exc:
+        parser.exit(1, f'docx-color: {args.input}: {type(exc).__name__}: {exc}\n')
     print(f'Saved: {destination}')
     print(json.dumps(stats, indent=2))
 
