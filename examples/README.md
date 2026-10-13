@@ -47,7 +47,8 @@ This synthetic example is not proof of complete Microsoft Word equivalence.
 
 The [usage GIF](../assets/demo.gif) shows the tracked input, an illustrated terminal
 running `uv run docx-color examples/tracked.docx examples/colored.docx -ic FF0000 -uc 000000`,
-and the converted result. The terminal output comes from an actual successful run;
+and a final side-by-side comparison that scrolls both first-page previews together.
+The terminal output comes from an actual successful run;
 typing and timings are staged. Document views are crops of the browser screenshots
 described below, not a Microsoft Word recording.
 

@@ -83,19 +83,16 @@ docx-color manuscript.docx manuscript_colored.docx -ic 0000FF -uc 000000
 The color options replace the former `--red` and `--black` names. Update existing
 commands to use `--inserted-color` and `--unchanged-color`; the default colors are unchanged.
 
-## Example: a Nature-style manuscript
+## Example:
 
 ![Animated workflow showing tracked edits, the conversion command and red-and-black output](assets/demo.gif)
 
 The animation combines actual CLI output with browser previews of the public
-synthetic DOCX. Typing and timing are staged for demonstration; it is not a
+synthetic DOCX, ending with synchronized scrolling of the before/after documents
+side by side. Typing and timing are staged for demonstration; it is not a
 Microsoft Word screen recording. Static previews are provided below.
 
-Try the included, four-page synthetic manuscript (approximately 1,450 words after acceptance). Its title, author block, bold
-summary, numbered citation, references, table and Methods follow an abridged
-structure inspired by [Nature's formatting guide](https://www.nature.com/nature/for-authors/formatting-guide).
-All names, data and the numbered reference are fictional; this is not an official
-Nature template or a published paper.
+Try the included, four-page synthetic manuscript (approximately 1,450 words after acceptance).
 
 Download the [tracked input](examples/tracked.docx) and
 [converted output](examples/colored.docx), or run from the checkout:
