@@ -74,6 +74,34 @@ Choose different insertion and unchanged-text colors:
 docx-color manuscript.docx manuscript_colored.docx --red 0000FF --black 000000
 ```
 
+## Example: a Nature-style manuscript
+
+Try the included, two-page synthetic manuscript. Its title, author block, bold
+summary, numbered citation, references, table and Methods follow an abridged
+structure inspired by [Nature's formatting guide](https://www.nature.com/nature/for-authors/formatting-guide).
+All names, data and the numbered reference are fictional; this is not an official
+Nature template or a published paper.
+
+Download the [tracked input](examples/nature-style/tracked.docx) and
+[converted output](examples/nature-style/colored.docx), or run from the checkout:
+
+```bash
+uv run docx-color examples/nature-style/tracked.docx examples/nature-style/colored.docx
+```
+
+This example accepts seven insertions and removes six deletion containers while
+preserving the table, equation and editable citation/hyperlink fields.
+
+| Before: tracked revisions | After: accepted and colored |
+| --- | --- |
+| ![Input manuscript with inserted text underlined and deleted text struck through](assets/nature-before.png) | ![Converted manuscript with inserted text red, unchanged text black and deleted text removed](assets/nature-after.png) |
+
+Screenshots show the actual DOCX files' first pages rendered in a browser with
+[docx-preview](https://github.com/VolodymyrBaydalka/docxjs). They are **not Microsoft
+Word screenshots** or evidence of identical Word layout. The input preview uses
+green underlines and red strikethroughs for revisions; output colors come from
+the converted DOCX. See [example generation and screenshot instructions](examples/nature-style/README.md).
+
 ## Command-line reference
 
 ```text
@@ -165,40 +193,6 @@ The optional report is published before the DOCX. These are separate atomic
 operations: if final DOCX publication fails, the report may already contain the
 attempted conversion's statistics.
 
-## Development
-
-Set up the development environment and run the CLI from the checkout:
-
-```bash
-uv sync
-uv run docx-color manuscript.docx manuscript_colored.docx
-```
-
-Run the tests and build distribution archives:
-
-```bash
-uv run pytest -v
-uv build
-```
-
-Normal tests use synthetic OOXML fixtures and do not require office applications
-or network access. Known defects use strict `XFAIL` markers. To run their underlying
-assertions without those markers:
-
-```bash
-uv run pytest -v --runxfail
-```
-
-Optional reference tests compare against documents manually saved in Microsoft Word
-after accepting all revisions. Missing private reference pairs are skipped; synthetic
-fixtures are never presented as Word-generated references. See the
-[reference fixture instructions](tests/fixtures/complex/README.md).
-
-Real manuscripts in `tests/fixtures/academic/` and DOCX files are ignored by Git
-and excluded from release archives. Source distributions include only approved
-source files, tests, synthetic fixtures and documentation. Do not commit private
-manuscripts or generated conversion artifacts.
-
 ## Documentation and contributing
 
 Read [AGENTS.md](AGENTS.md) for development invariants and contribution guidance.
@@ -214,4 +208,4 @@ documents as public issue attachments.
 
 ## License
 
-A license has not yet been specified in this repository.
+Licensed under the [MIT License](LICENSE).

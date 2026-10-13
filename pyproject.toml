@@ -6,6 +6,8 @@ build-backend = "hatchling.build"
 name = "docx-color-cli"
 version = "0.3.0"
 description = "Convert DOCX tracked text revisions into permanent font colors"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = ["lxml>=5"]
 
@@ -39,6 +41,7 @@ include = [
     "/tests/fixtures/complex/README.md",
     "/docs/*.md",
     "/README.md",
+    "/LICENSE",
     "/AGENTS.md",
     "/pyproject.toml",
     "/uv.lock",

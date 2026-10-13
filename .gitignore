@@ -15,3 +15,8 @@ tests/fixtures/academic/
 *.docx
 /report.json
 /docs/
+/AGENTS.md
+
+# Explicitly public synthetic demonstration; private DOCX files stay ignored.
+!/examples/nature-style/tracked.docx
+!/examples/nature-style/colored.docx
