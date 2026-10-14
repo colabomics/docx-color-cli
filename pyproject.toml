@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docx-color-cli"
-version = "1.0.0"
+version = "1.0.1"
 description = "Convert DOCX tracked text revisions into permanent font colors"
 readme = "README.md"
 authors = [{name = "lzj1769", email = "lzj1769@gmail.com"}]
