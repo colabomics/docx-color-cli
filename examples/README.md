@@ -42,29 +42,3 @@ not linked to a real Zotero library.
 Validation checks exact retained characters and colors, deletion absence,
 field codes/boundaries, equation text, paragraph/table counts and DOCX integrity.
 This synthetic example is not proof of complete Microsoft Word equivalence.
-
-## Preview images
-
-The [usage GIF](../assets/demo.gif) shows the tracked input, an illustrated terminal
-running `uv run docx-color examples/tracked.docx examples/colored.docx -ic FF0000 -uc 000000`,
-and a final side-by-side comparison that scrolls both first-page previews together.
-The terminal output comes from an actual successful run;
-typing and timings are staged. Document views are crops of the browser screenshots
-described below, not a Microsoft Word recording.
-
-The two images embedded in the main README show the first page of the actual
-DOCX files, rendered using docx-preview 0.3.7 in headless Chrome. They are browser
-screenshots, **not Microsoft Word screenshots**. Different fonts or renderers may
-produce different pagination.
-
-Before conversion, author colors are derived from each revision’s actual
-`w:author` metadata, with underlined insertions and struck-through deletions.
-After conversion, all retained inserted text is red and unchanged text is black,
-regardless of the revising author. Output colors are read from the DOCX itself.
-
-The local maintenance scripts `generate.py` and `render.js` are deliberately
-Git-ignored and are not distributed. The example can be converted using only
-the public input DOCX and the installed Python package.
-
-Only these two explicitly named synthetic DOCX files are exempt from the Git
-DOCX ignore rule. Private manuscripts and reference documents remain excluded.
