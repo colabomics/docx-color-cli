@@ -7,6 +7,7 @@ Unsupported revisions are always rejected before publication.
 import argparse
 import json
 import re
+import sys
 from collections import Counter
 from copy import copy
 from importlib.metadata import version
@@ -226,16 +227,31 @@ def check_paths(*paths):
 
 
 def convert(
-    source, target, *, black="000000", red="FF0000", _report=None, reference=None
+    source,
+    target,
+    *,
+    black="000000",
+    red="FF0000",
+    _report=None,
+    reference=None,
+    reference_mode="semantic",
 ):
     """Validate and publish a colored DOCX; failures raise ConversionError."""
     with conversion_context():
         return _convert(
-            source, target, black=black, red=red, _report=_report, reference=reference
+            source,
+            target,
+            black=black,
+            red=red,
+            _report=_report,
+            reference=reference,
+            reference_mode=reference_mode,
         )
 
 
-def check(source, *, black="000000", red="FF0000", reference=None):
+def check(
+    source, *, black="000000", red="FF0000", reference=None, reference_mode="semantic"
+):
     """Run the complete conversion checks in disposable storage, without publication."""
     with conversion_context():
         check_paths(source, reference)
@@ -246,6 +262,7 @@ def check(source, *, black="000000", red="FF0000", reference=None):
                 black=black,
                 red=red,
                 reference=reference,
+                reference_mode=reference_mode,
                 _publish=False,
             )
 
@@ -258,8 +275,11 @@ def _convert(
     red="FF0000",
     _report=None,
     reference=None,
+    reference_mode="semantic",
     _publish=True,
 ):
+    if reference_mode not in {"semantic", "strict"}:
+        raise ValueError("reference_mode must be semantic or strict")
     source, target = Path(source), Path(target)
     check_paths(source, target, _report, reference)
     if not source.is_file():
@@ -354,13 +374,21 @@ def _convert(
                         raise ConversionError(
                             "unexpected output payload change", part=name
                         )
+            summary = dict(stats)
             if reference is not None:
                 from .validation import validate_docx
 
-                validate_docx(temp, reference).require()
-                stats["reference_validated"] = 1
+                comparison = validate_docx(
+                    temp, reference, semantic=reference_mode == "semantic"
+                )
+                comparison.require()
+                summary["reference_validated"] = 1
+                summary["reference_validation"] = {
+                    "mode": reference_mode,
+                    **comparison.to_dict(),
+                }
             if not _publish:
-                return dict(stats)
+                return summary
             if _report is not None:
                 _report = Path(_report)
                 _report.parent.mkdir(parents=True, exist_ok=True)
@@ -369,7 +397,7 @@ def _convert(
                 ) as f:
                     report_temp = Path(f.name)
                 report_temp.write_text(
-                    json.dumps(dict(stats), indent=2, ensure_ascii=False),
+                    json.dumps(summary, indent=2, ensure_ascii=False),
                     encoding="utf-8",
                 )
             check_paths(source, target, _report, reference)
@@ -395,14 +423,34 @@ def _convert(
             temp.unlink(missing_ok=True)
             if report_temp is not None:
                 report_temp.unlink(missing_ok=True)
-    return dict(stats)
+    return summary
 
 
-def convert_output(source, target, *, black="000000", red="FF0000", reference=None):
+def convert_output(
+    source,
+    target,
+    *,
+    black="000000",
+    red="FF0000",
+    reference=None,
+    reference_mode="semantic",
+):
     """Write a color-coded DOCX; no other output format is supported."""
     if Path(target).suffix.lower() != ".docx":
         raise ConversionError("Output must end in .docx")
-    return convert(source, target, black=black, red=red, reference=reference)
+    return convert(
+        source,
+        target,
+        black=black,
+        red=red,
+        reference=reference,
+        reference_mode=reference_mode,
+    )
+
+
+def _reference_warnings(summary):
+    for warning in summary.get("reference_validation", {}).get("warnings", []):
+        print(f"docx-color: reference: {warning}", file=sys.stderr)
 
 
 def main(argv=None):
@@ -433,6 +481,11 @@ def main(argv=None):
         type=Path,
         help="Compare with a Word-accepted DOCX; any mismatch prevents publication",
     )
+    parser.add_argument(
+        "--reference-mode",
+        choices=("semantic", "strict"),
+        help="Reference comparison mode (default: semantic); requires --reference",
+    )
     parser.add_argument("--report", type=Path, help="Write JSON summary")
     parser.add_argument(
         "--check",
@@ -441,6 +494,8 @@ def main(argv=None):
     )
     # Keep options between input and optional output portable across Python versions.
     args = parser.parse_intermixed_args(argv)
+    if args.reference_mode is not None and args.reference is None:
+        parser.error("--reference-mode requires --reference")
     if args.check and (args.output is not None or args.report is not None):
         parser.error("--check cannot be combined with output or --report")
     destination = args.output or args.input.with_name(args.input.stem + "_colored.docx")
@@ -448,12 +503,14 @@ def main(argv=None):
         parser.error("Output must be a .docx file")
     try:
         if args.check:
-            check(
+            summary = check(
                 args.input,
                 black=args.unchanged_color,
                 red=args.inserted_color,
                 reference=args.reference,
+                reference_mode=args.reference_mode or "semantic",
             )
+            _reference_warnings(summary)
             print(f"Check passed: {args.input}")
             return
         stats = convert(
@@ -463,9 +520,11 @@ def main(argv=None):
             red=args.inserted_color,
             _report=args.report,
             reference=args.reference,
+            reference_mode=args.reference_mode or "semantic",
         )
     except (OSError, BadZipFile, etree.XMLSyntaxError, ValueError) as exc:
         parser.exit(1, f"docx-color: {args.input}: {type(exc).__name__}: {exc}\n")
+    _reference_warnings(stats)
     print(f"Saved: {destination}")
     print(json.dumps(stats, indent=2))
 

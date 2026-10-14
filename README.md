@@ -22,7 +22,7 @@ with every Word document and identical rendering in Microsoft Word are not guara
 Requires **Python 3.11+**. CI tests Python 3.11, 3.12 and 3.13 on Linux, macOS and
 Windows. The only runtime dependency is `lxml`; Microsoft Word is not required.
 
-Recommended: run directly with uv (after a release is available on PyPI):
+Recommended: run directly with uv:
 
 ```bash
 uvx docx-color-cli input.docx output.docx
@@ -119,9 +119,24 @@ docx-color manuscript.docx manuscript_colored.docx --reference accepted_in_word.
 
 Any comparison failure prevents publication and preserves an existing output.
 Comparison checks logical text, structure, editable fields, equations and linked
-resources, ignoring font colors and equivalent run splitting. It is conservative:
-Word re-save differences can also cause a rejection. It does not verify the
-reference's provenance or identical page layout. No Word automation is used.
+resources, ignoring font colors and equivalent run splitting. By default,
+`--reference` uses **bounded semantic comparison**: it also recognizes bookmark ID
+renumbering (names and ranges must match), view zoom, drawing edit identifiers, and
+supported editable HTTP(S) hyperlink field/element representations, including a
+single trailing `\h` visit-history switch. Applied equivalences are reported on
+stderr and in the JSON report's `reference_validation` record, along with the mode
+and checked parts. Normalization affects comparison only, never the saved DOCX.
+
+Text, meaningful whitespace, structure, field results, link targets, images and
+font signatures remain checked. Unknown field switches and other unrecognized
+differences still fail. For conservative representation comparison, use:
+
+```bash
+docx-color manuscript.docx manuscript_colored.docx --reference accepted_in_word.docx --reference-mode strict
+```
+
+There is no automatic fallback between modes. Neither mode verifies the reference's
+provenance or identical page layout. No Word automation is used.
 
 ## Check without publishing
 
@@ -142,7 +157,7 @@ Unsupported revisions are always rejected; there is no permissive mode.
 
 ```text
 docx-color [-h] [--version] [--inserted-color RGB] [--unchanged-color RGB] [--report REPORT]
-           [--reference REFERENCE] [--check] input [output]
+           [--reference REFERENCE] [--reference-mode {semantic,strict}] [--check] input [output]
 ```
 
 | Argument | Description | Default |
@@ -152,6 +167,7 @@ docx-color [-h] [--version] [--inserted-color RGB] [--unchanged-color RGB] [--re
 | `-ic`, `--inserted-color` | Color for inserted text, as six hexadecimal digits without `#` | `FF0000` |
 | `-uc`, `--unchanged-color` | Color for unchanged text, in the same format | `000000` |
 | `--reference` | Word-accepted DOCX; mismatches block output publication | No external comparison |
+| `--reference-mode` | `semantic` or `strict`; requires `--reference` | `semantic` |
 | `--report` | Path for a JSON conversion-statistics report | No report file |
 | `--check` | Validate input and conversion support without publishing output | Disabled |
 | `-h`, `--help` | Show command help | — |
@@ -227,7 +243,8 @@ They are not a complete OOXML schema validator or a rendering engine.
 The independent comparator is also available as
 `docx_color_cli.validation.validate_docx(output, reference)`. Its optional
 `semantic=True` comparison recognizes a small, tested set of representation
-alternatives and reports each normalization; the CLI uses the conservative default.
+alternatives and reports each normalization. This independent API keeps its strict
+default; the conversion APIs and CLI select `semantic=True` by default.
 The private academic sample's body passes bounded semantic comparison, while full
 comparison still detects font-signature differences. These remain deliberately
 unignored. This is evidence for the tested sample, not a guarantee for all documents.
@@ -235,10 +252,10 @@ unignored. This is evidence for the tested sample, not a guarantee for all docum
 ## Python API and diagnostics
 
 `docx_color_cli.cli` exposes `modify(root, stats, original, added)`,
-`convert(source, target, *, black, red, reference)` and
-`convert_output(source, target, *, black, red, reference)`, retaining their existing
+`convert(source, target, *, black, red, reference, reference_mode="semantic")` and
+`convert_output(source, target, *, black, red, reference, reference_mode="semantic")`, retaining their existing
 color defaults. They no longer accept a `strict` parameter. `check(source, *,
-black, red, reference)` runs the same checks without publication.
+black, red, reference, reference_mode="semantic")` runs the same checks without publication.
 
 Expected conversion failures raise `ConversionError` from `docx_color_cli.errors`
 (a `ValueError` subclass). Diagnostics expose `part`, `revision_type`, `element`,

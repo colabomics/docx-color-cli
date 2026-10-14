@@ -21,5 +21,7 @@ tests/fixtures/academic/
 !/examples/tracked.docx
 !/examples/colored.docx
 /examples/generate.py
+/examples/complex_tracked.docx
+/examples/complex_reference.docx
 /examples/render.js
 /examples/render.cjs
