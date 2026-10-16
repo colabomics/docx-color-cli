@@ -118,7 +118,7 @@ def check_distributions(wheel, version):
             "README.md",
             "README.zh-CN.md",
             "RELEASE.md",
-            "RELEASE_NOTES_1.1.0.md",
+            "RELEASE_NOTES_1.2.0.md",
             "LICENSE",
             "pyproject.toml",
             "uv.lock",
@@ -141,7 +141,7 @@ def check_distributions(wheel, version):
         assert any(n.endswith("/README.zh-CN.md") for n in names)
         for required in (
             "RELEASE.md",
-            "RELEASE_NOTES_1.1.0.md",
+            "RELEASE_NOTES_1.2.0.md",
             "scripts/release.py",
             "tests/test_release.py",
             ".github/workflows/publish.yml",

@@ -189,7 +189,7 @@ def test_annotated_tag_precedes_release_and_has_original_commit(monkeypatch, tmp
     assert not any("--force" in call for call in calls)
 
 
-def test_workflow_security_and_ci_gates():
+def test_workflow_main_version_change_publication():
     ci = yaml.load(
         (ROOT / ".github/workflows/ci.yml").read_text(), Loader=yaml.BaseLoader
     )
@@ -206,27 +206,20 @@ def test_workflow_security_and_ci_gates():
         "defaults" not in ci["jobs"]["test"]
     )  # Native runner shells, no Windows Bash assumption.
     assert "id-token" not in str(ci)
-    assert list(publish["on"]) == ["workflow_dispatch"]
-    inputs = publish["on"]["workflow_dispatch"]["inputs"]
-    assert inputs["publish"]["default"] == "false"
-    assert inputs["publish"]["type"] == "boolean"
-    assert inputs["version"]["required"] == "true"
+    assert publish["on"] == {"push": {"branches": ["main"]}}
     assert publish["permissions"] == {"contents": "read"}
-    assert publish["concurrency"]["cancel-in-progress"] == "false"
     jobs = publish["jobs"]
-    assert jobs["validate"]["uses"] == "./.github/workflows/ci.yml"
-    assert jobs["build"]["needs"] == "validate"
-    assert jobs["publish"]["needs"] == ["validate", "build"]
+    assert set(jobs) == {"version", "build", "publish"}
+    assert jobs["build"]["needs"] == "version"
+    assert jobs["build"]["if"] == "needs.version.outputs.changed == 'true'"
+    assert jobs["publish"]["needs"] == "build"
+    assert "if" not in jobs["publish"]
     assert jobs["publish"]["permissions"] == {"id-token": "write"}
     assert jobs["publish"]["environment"]["name"] == "pypi"
-    for gate in [
-        "refs/heads/main",
-        "workflow_dispatch",
-        "colabomics/docx-color-cli",
-        "inputs.publish",
-        "vars.PYPI_RELEASE_ENABLED == 'true'",
-    ]:
-        assert gate in jobs["publish"]["if"]
+    assert "PYPI_RELEASE_ENABLED" not in str(publish)
+    assert "workflow_dispatch" not in str(publish)
+    assert not any("ci.yml" in str(job) for job in jobs.values())
+    assert not any("pytest" in str(job) or "twine" in str(job) for job in jobs.values())
     steps = jobs["publish"]["steps"]
     assert len(steps) == 2  # No source/build execution with OIDC credentials.
     assert steps[0]["uses"].startswith("actions/download-artifact@")
@@ -307,49 +300,45 @@ def test_detect_reads_previous_commit_and_filters_empty_pypi_versions(
 
 
 @pytest.mark.parametrize(
-    "requested,upload,published,fails",
+    "previous,current,before,changed",
     [
-        ("current", "false", [], False),
-        ("not-the-reviewed-version", "false", [], True),
-        ("current", "true", ["current"], True),
-        ("current", "true", ["9999.0"], True),
-        ("current", "true", ["0.4.0"], False),
+        ("1.1.0", "1.1.1", "a" * 40, True),
+        ("1.1.0", "1.1.0", "a" * 40, False),
+        ("1.2.0", "1.1.0", "a" * 40, True),
+        ("1.1.0", "1.1.1", "0" * 40, False),
+        ("1.1.0", "1.1.1", "", False),
     ],
 )
-def test_manual_release_version_guard_offline(
-    monkeypatch, requested, upload, published, fails
+def test_push_version_detection_offline(
+    monkeypatch, tmp_path, previous, current, before, changed
 ):
-    """Execute the workflow's actual Python guard, with no HTTP/upload permission."""
-    monkeypatch.syspath_prepend(str(ROOT))
-    from scripts import release as workflow_release
+    """Execute the exact workflow detector without network or upload operations."""
+    import subprocess
 
     workflow = yaml.load(
         (ROOT / ".github/workflows/publish.yml").read_text(), Loader=yaml.BaseLoader
     )
     step = next(
-        s
-        for s in workflow["jobs"]["build"]["steps"]
-        if s.get("name", "").startswith("Verify explicit version")
+        s for s in workflow["jobs"]["version"]["steps"] if s.get("id") == "version"
     )
-    assert step["shell"] == "bash"  # Build job is explicitly Ubuntu, never Windows.
-    command = step["run"]
-    assert command.startswith("uv run --no-sync python - <<'PY'\n")
-    code = command.split("\n", 1)[1].rsplit("\nPY", 1)[0]
-    monkeypatch.chdir(ROOT)
-    version = workflow_release.project_version((ROOT / "pyproject.toml").read_text())
-    requested = version if requested == "current" else requested
-    published = [version if v == "current" else v for v in published]
-    monkeypatch.setenv("REQUESTED_VERSION", requested)
-    monkeypatch.setenv("REQUEST_UPLOAD", upload)
+    assert step["shell"] == "python"
+    # Different descriptions and tool versions must not be mistaken for project versions.
+    (tmp_path / "pyproject.toml").write_text(
+        f'[project]\nname="docx-color-cli"\nversion="{current}"\ndescription="new"\n[tool.example]\nversion="999"\n',
+        encoding="utf-8",
+    )
+    output = tmp_path / "output"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("BEFORE_SHA", before)
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    calls = []
 
-    def metadata_only(url):
-        assert upload == "true", "Dry run must not query PyPI"
-        assert url == "https://pypi.org/pypi/docx-color-cli/json"
-        return {"releases": {v: [{}] for v in published}}
+    def read_commit(args, **kwargs):
+        calls.append(args)
+        assert args == ["git", "show", f"{before}:pyproject.toml"]
+        return f'[project]\nname="docx-color-cli"\nversion="{previous}"\ndescription="old"\n[tool.example]\nversion="111"\n'
 
-    monkeypatch.setattr(workflow_release, "get_json", metadata_only)
-    if fails:
-        with pytest.raises((SystemExit, ValueError)):
-            exec(compile(code, "workflow-version-guard", "exec"), {})
-    else:
-        exec(compile(code, "workflow-version-guard", "exec"), {})
+    monkeypatch.setattr(subprocess, "check_output", read_commit)
+    exec(compile(step["run"], "workflow-version-detection", "exec"), {})
+    assert output.read_text() == f"changed={str(changed).lower()}\n"
+    assert len(calls) == (1 if before and set(before) != {"0"} else 0)
