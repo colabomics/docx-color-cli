@@ -3,17 +3,6 @@ from helpers.content import validate_docx
 from helpers.fixtures import field, p, relationships, run, story
 
 
-@pytest.fixture(autouse=True, params=["helper", "production"])
-def select_validator(request, monkeypatch):
-    import sys
-
-    if request.param == "helper":
-        from helpers.content import validate_docx as implementation
-    else:
-        from docx_color_cli.validation import validate_docx as implementation
-    monkeypatch.setattr(sys.modules[__name__], "validate_docx", implementation)
-
-
 def test_bookmark_renumbering_keeps_name_pair_and_position(docx):
     def body(ident, name="target", inside="x"):
         return p(

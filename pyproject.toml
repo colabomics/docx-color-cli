@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docx-color-cli"
-version = "1.0.1"
-description = "Convert DOCX tracked text revisions into permanent font colors"
+version = "1.1.0"
+description = "Color surviving insertions on a corresponding Word-accepted DOCX"
 readme = "README.md"
 authors = [{name = "lzj1769", email = "lzj1769@gmail.com"}]
 classifiers = [
@@ -34,7 +34,6 @@ dev = ["pytest>=8", "ruff==0.16.6", "packaging>=24", "twine>=6", "pyyaml>=6"]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 xfail_strict = true
-markers = ["word_reference: requires a manually supplied Microsoft Word accepted-reference pair"]
 
 [project.scripts]
 docx-color = "docx_color_cli.cli:main"
@@ -47,24 +46,27 @@ packages = ["src/docx_color_cli"]
 include = [
     "/src/docx_color_cli/**/*.py",
     "/tests/**/*.py",
+    "/tests/benchmark/README.md",
+    "/tests/benchmark/manifest.json",
     "/tests/fixtures/basic/*.json",
-    "/tests/fixtures/paragraphs/*.xml",
-    "/tests/fixtures/tables/*.xml",
-    "/tests/fixtures/fields/*.xml",
-    "/tests/fixtures/equations/*.xml",
-    "/tests/fixtures/complex/README.md",
-    "/docs/*.md",
     "/README.md",
+    "/README.zh-CN.md",
     "/RELEASE.md",
+    "/RELEASE_NOTES_1.1.0.md",
     "/scripts/**/*.py",
     "/.github/workflows/*.yml",
     "/release-provenance.json",
     "/LICENSE",
-    "/AGENTS.md",
     "/pyproject.toml",
     "/uv.lock",
 ]
-exclude = ["/tests/fixtures/academic/**", "**/*.docx", "**/.DS_Store"]
+
+exclude = [
+    "/tests/fixtures/academic/**",
+    "/scripts/generate_demo.py",
+    "**/*.docx",
+    "**/.DS_Store",
+]
 
 [tool.ruff]
 target-version = "py311"

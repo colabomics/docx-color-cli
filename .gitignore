@@ -12,16 +12,8 @@ htmlcov/
 
 # Private, local-only Word reference pairs and generated artifacts.
 tests/fixtures/academic/
-*.docx
 /report.json
 /docs/
-/AGENTS.md
 
-# Explicitly public synthetic demonstration; private DOCX files stay ignored.
-!/examples/tracked.docx
-!/examples/colored.docx
-/examples/generate.py
-/examples/complex_tracked.docx
-/examples/complex_reference.docx
-/examples/render.js
-/examples/render.cjs
+# Reproducible public benchmark materializations.
+/.benchmark-output/

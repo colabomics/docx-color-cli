@@ -1,12 +1,45 @@
 """Read-only OPC checks. These checks do not prove Microsoft Word equivalence."""
 
 import posixpath
-from collections import Counter
 from urllib.parse import unquote, urlsplit
 
-from lxml import etree
+from .errors import ColoringError, ConversionError, conversion_context
 
-from .errors import ConversionError, UnsupportedRevisionError, conversion_context
+# Bound advertised archive expansion before any member is decompressed. These
+# are resource limits, not schema/Word compatibility or insertion heuristics.
+MAX_ZIP_MEMBERS = 4096
+MAX_ZIP_BYTES = 256 * 1024 * 1024
+MAX_XML_BYTES = 32 * 1024 * 1024
+MAX_COMPRESSION_RATIO = 1000
+
+
+def validate_archive_directory(infos):
+    """Reject unsafe package names and excessive declared expansion before reads."""
+    if len(infos) > MAX_ZIP_MEMBERS or sum(i.file_size for i in infos) > MAX_ZIP_BYTES:
+        raise ColoringError(
+            "UNSUPPORTED_CONTENT", "DOCX exceeds the archive resource budget."
+        )
+    for info in infos:
+        name = info.filename
+        parts = (name[:-1] if name.endswith("/") else name).split("/")
+        if (
+            info.orig_filename != name
+            or "\\" in name
+            or ":" in parts[0]
+            or any(part in {"", ".", ".."} for part in parts)
+        ):
+            raise ValueError("Noncanonical or unsafe ZIP member name")
+        if (
+            name.endswith((".xml", ".rels"))
+            and info.file_size > MAX_XML_BYTES
+            or info.file_size >= 1024 * 1024
+            and info.file_size > MAX_COMPRESSION_RATIO * max(1, info.compress_size)
+        ):
+            raise ColoringError(
+                "UNSUPPORTED_CONTENT",
+                "DOCX exceeds the XML or compression resource budget.",
+            )
+
 
 W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 W = "{" + W_NS + "}"
@@ -14,15 +47,6 @@ R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 R = "{" + R_NS + "}"
 PKG = "{http://schemas.openxmlformats.org/package/2006/relationships}"
 CT = "{http://schemas.openxmlformats.org/package/2006/content-types}"
-STORIES = {
-    "document",
-    "hdr",
-    "ftr",
-    "footnotes",
-    "endnotes",
-    "comments",
-    "glossaryDocument",
-}
 STORY_TYPES = {
     "officeDocument": "document",
     "header": "hdr",
@@ -32,46 +56,6 @@ STORY_TYPES = {
     "comments": "comments",
     "glossaryDocument": "glossaryDocument",
 }
-
-
-def read_xml_parts(archive):
-    names = archive.namelist()
-    if len(names) != len(set(names)):
-        raise ValueError("Duplicate ZIP members")
-    if "word/document.xml" not in names:
-        raise ConversionError(
-            "Missing word/document.xml: not a valid DOCX", part="word/document.xml"
-        )
-    roots = {}
-    for name in names:
-        if name.endswith((".xml", ".rels")):
-            try:
-                root = etree.fromstring(
-                    archive.read(name),
-                    etree.XMLParser(resolve_entities=False, no_network=True),
-                )
-            except etree.XMLSyntaxError as exc:
-                raise ConversionError(
-                    str(exc), part=name, cause_type="XMLSyntaxError"
-                ) from exc
-            if root.getroottree().docinfo.doctype:
-                raise ConversionError("DTD is unsupported", part=name)
-            from .namespaces import canonical_namespaces
-
-            with conversion_context(part=name):
-                root = canonical_namespaces(root)
-            roots[name] = root
-    if roots["word/document.xml"].tag != W + "document":
-        raise ConversionError(
-            "expected Word document root",
-            part="word/document.xml",
-            node=roots["word/document.xml"],
-        )
-    if roots["word/document.xml"].find(W + "body") is None:
-        raise ConversionError(
-            "missing body", part="word/document.xml", node=roots["word/document.xml"]
-        )
-    return roots
 
 
 def relationship_source(name):
@@ -98,40 +82,8 @@ def relationship_target(source, target):
     return resolved
 
 
-def discover_stories(roots):
-    """Discover by XML roots and verify relationship-declared story roots."""
-    stories = {
-        name: root
-        for name, root in roots.items()
-        if root.tag in {W + s for s in STORIES}
-    }
-    for name, root in roots.items():
-        if not name.endswith(".rels"):
-            continue
-        source = relationship_source(name)
-        for rel in root:
-            kind = rel.get("Type", "")
-            expected = (
-                STORY_TYPES.get(kind.removeprefix(R_NS + "/"))
-                if kind.startswith(R_NS + "/")
-                else None
-            )
-            if expected:
-                if rel.get("TargetMode") == "External":
-                    raise ConversionError("external story is unsupported", part=name)
-                with conversion_context(part=name):
-                    dest = relationship_target(source, rel.get("Target", ""))
-                if dest not in roots or roots[dest].tag != W + expected:
-                    raise ConversionError(
-                        f"invalid {expected} story target {dest}", part=name
-                    )
-    return stories
-
-
-def validate_package(archive, roots, *, accepted=False):
+def validate_package(archive, roots):
     """Check publication prerequisites; not a full OOXML schema/Word validator."""
-    from .revisions import is_revision
-
     names = set(archive.namelist())
     if archive.testzip() is not None:
         raise ValueError("Invalid ZIP checksum")
@@ -231,13 +183,6 @@ def validate_package(archive, roots, *, accepted=False):
         for node in root.iter():
             if not isinstance(node.tag, str):
                 continue
-            if accepted and is_revision(node):
-                raise UnsupportedRevisionError(
-                    "residual unsupported revision",
-                    part=name,
-                    node=node,
-                    revision_type=etree.QName(node).localname,
-                )
             for attribute, value in node.attrib.items():
                 if attribute.startswith(R) and value not in links.get(name, {}):
                     raise ConversionError(
@@ -268,236 +213,3 @@ def validate_package(archive, roots, *, accepted=False):
                         raise ConversionError(
                             f"dangling {kind} reference", part=name, node=node
                         )
-        if accepted and root.tag in {W + s for s in STORIES}:
-            with conversion_context(part=name):
-                validate_story(root, name)
-
-
-def validate_story(root, name):
-    """Validate retained fields and ranges in each independent text story."""
-    containers = {
-        W + n
-        for n in (
-            "body",
-            "hdr",
-            "ftr",
-            "footnote",
-            "endnote",
-            "comment",
-            "txbxContent",
-            "docPartBody",
-            "fldSimple",
-        )
-    }
-    from .compatibility import BRANCHES
-    from .math_revisions import OBJECTS
-    from .revisions import M
-    from .tables import validate_grid
-
-    containers |= BRANCHES
-
-    def check(container):
-        stack = []
-        starts, ends = {}, set()
-
-        def walk(node):
-            if node is not container and node.tag in containers:
-                check(node)
-                return
-            if node.tag == W + "fldChar":
-                kind = node.get(W + "fldCharType")
-                if kind == "begin":
-                    stack.append(False)
-                elif kind == "separate" and stack and not stack[-1]:
-                    stack[-1] = True
-                elif kind == "end" and stack:
-                    stack.pop()
-                else:
-                    raise ConversionError(
-                        "broken Word field boundary", part=name, node=node
-                    )
-            if node.tag == W + "instrText" and (not stack or stack[-1]):
-                raise ConversionError(
-                    "field instruction outside code region", part=name, node=node
-                )
-            if node.tag == W + "bookmarkStart":
-                ident = node.get(W + "id")
-                if ident is None or ident in starts:
-                    raise ConversionError(
-                        "duplicate/missing bookmark identity", part=name, node=node
-                    )
-                starts[ident] = node.get(W + "name")
-            if node.tag == W + "bookmarkEnd":
-                ident = node.get(W + "id")
-                if ident not in starts or ident in ends:
-                    raise ConversionError("orphan bookmark end", part=name, node=node)
-                ends.add(ident)
-            if (
-                node.tag
-                == "{http://schemas.openxmlformats.org/officeDocument/2006/math}f"
-            ):
-                ns = "{http://schemas.openxmlformats.org/officeDocument/2006/math}"
-                if (
-                    len(node.findall(ns + "num")) != 1
-                    or len(node.findall(ns + "den")) != 1
-                ):
-                    raise ConversionError(
-                        "incomplete mathematical fraction", part=name, node=node
-                    )
-            if node.tag.startswith(M) and etree.QName(node).localname in OBJECTS:
-                kind = etree.QName(node).localname
-                for argument in OBJECTS[kind]:
-                    count = len(node.findall(M + argument))
-                    repeatable = kind in {"d", "eqArr", "m"}
-                    if count == 0 or not repeatable and count != 1:
-                        raise ConversionError(
-                            f"malformed OMML {kind}/{argument} cardinality",
-                            part=name,
-                            node=node,
-                        )
-            if node.tag == W + "tbl":
-                validate_grid(node)
-            if (
-                node.tag == W + "tc"
-                and node.find(W + "p") is None
-                and node.find(W + "sdt") is None
-            ):
-                raise ConversionError(
-                    "table cell has no paragraph", part=name, node=node
-                )
-            for child in node:
-                if isinstance(child.tag, str):
-                    walk(child)
-
-        walk(container)
-        if stack:
-            raise ConversionError("unclosed Word field", part=name, node=container)
-        if set(starts) != ends:
-            raise ConversionError("unclosed bookmark", part=name, node=container)
-
-    check(root)
-
-
-def retained_content(root):
-    """Ordered payload inventory for the supported transformations.
-
-    This invariant catches lost/duplicated/reordered retained payload. It deliberately
-    ignores paragraph and row boundaries (checked separately), and is NOT a reference
-    DOCX comparison or an independent implementation of Word revision semantics.
-    """
-    from .math_revisions import deleted_objects, emptied_containers
-    from .math_runs import mixed, split_mixed_runs
-    from .revisions import HISTORY
-    from .tables import deleted_cell, deleted_row
-
-    if any(
-        mixed(n)
-        for n in root.iter(
-            "{http://schemas.openxmlformats.org/officeDocument/2006/math}r"
-        )
-    ):
-        from copy import deepcopy
-
-        root = deepcopy(root)
-        split_mixed_runs(root)
-    removed_math = deleted_objects(root)
-    removed_math |= emptied_containers(root, removed_math)
-
-    math = "{http://schemas.openxmlformats.org/officeDocument/2006/math}"
-    atoms = {
-        W + n
-        for n in (
-            "t",
-            "instrText",
-            "tab",
-            "br",
-            "cr",
-            "sym",
-            "noBreakHyphen",
-            "softHyphen",
-            "fldChar",
-            "fldSimple",
-            "hyperlink",
-            "footnoteReference",
-            "endnoteReference",
-            "commentReference",
-            "bookmarkStart",
-            "bookmarkEnd",
-            "drawing",
-            "pict",
-            "object",
-        )
-    }
-    events = []
-
-    def visit(node):
-        if node in removed_math:
-            return
-        if not isinstance(node.tag, str):
-            return
-        if node.tag in {
-            W + n for n in HISTORY | {"del", "moveFrom", "delText", "delInstrText"}
-        }:
-            return
-        if node.tag == W + "tc" and deleted_cell(node):
-            return
-        if node.tag == W + "tr" and deleted_row(node):
-            return
-        if node.tag == math + "r":
-            # Only a chain of whole-run edits can delete the run itself. A
-            # deletion in a historical property snapshot is not active content.
-            payload = next((c for c in node if c.tag in {W + "ins", W + "del"}), None)
-            while payload is not None:
-                if payload.tag == W + "del":
-                    return
-                payload = next(
-                    (c for c in payload if c.tag in {W + "ins", W + "del"}), None
-                )
-        if (
-            node.tag in atoms
-            or node.tag.startswith(math)
-            or any(a.startswith(R) for a in node.attrib)
-        ):
-            events.append(
-                (
-                    node.tag,
-                    tuple(sorted(node.attrib.items())),
-                    node.text
-                    if node.tag in {W + "t", W + "instrText", math + "t"}
-                    else None,
-                )
-            )
-        for child in node:
-            visit(child)
-
-    visit(root)
-    return tuple(events)
-
-
-def retained_structure(root):
-    """Count retained blocks before paragraph merging, independent of node moves."""
-    from .revisions import HISTORY
-    from .tables import deleted_cell, deleted_row
-
-    counts = Counter()
-
-    def visit(node):
-        if not isinstance(node.tag, str) or node.tag in {
-            W + n for n in HISTORY | {"del", "moveFrom"}
-        }:
-            return
-        if node.tag == W + "tc" and deleted_cell(node):
-            return
-        if node.tag == W + "tr" and deleted_row(node):
-            return
-        if node.tag == W + "tbl":
-            rows = node.findall(W + "tr")
-            if rows and all(deleted_row(r) for r in rows):
-                return
-        if node.tag in {W + n for n in ("p", "tbl", "tr", "tc")}:
-            counts[etree.QName(node).localname] += 1
-        for child in node:
-            visit(child)
-
-    visit(root)
-    return counts

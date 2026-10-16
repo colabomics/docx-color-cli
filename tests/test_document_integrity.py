@@ -1,92 +1,13 @@
+"""Malformed OPC regressions now exercise the supported two-input API."""
+
 import warnings
-from contextlib import suppress
 from zipfile import ZipFile
 
 import pytest
-from helpers.assertions import assert_integrity, assert_rejects_without_output, xml_part
 from helpers.content import inspect_docx
-from helpers.fixtures import (
-    W_NS,
-    delete,
-    insert,
-    p,
-    paragraph,
-    relationships,
-    rewrite,
-    story,
-)
+from helpers.fixtures import p, paragraph, relationships, rewrite
 
-from docx_color_cli.cli import convert, main
-
-
-def test_DI001_unrelated_zip_members_preserved(docx, tmp_path):
-    extras = {
-        "word/media/pixel.bin": b"opaque-object",
-        "customXml/item1.xml": "<metadata>opaque</metadata>",
-    }
-    source = docx("source.docx", p(delete("old") + insert("new")), extras)
-    target = tmp_path / "out.docx"
-    convert(source, target)
-    with ZipFile(source) as original, ZipFile(target) as output:
-        assert output.namelist() == original.namelist()
-        assert output.testzip() is None
-        for name in original.namelist():
-            if name != "word/document.xml":
-                assert output.read(name) == original.read(name)
-            before, after = original.getinfo(name), output.getinfo(name)
-            assert (before.date_time, before.compress_type, before.external_attr) == (
-                after.date_time,
-                after.compress_type,
-                after.external_attr,
-            )
-
-
-def test_DI002_deterministic_content_and_counts(docx, tmp_path):
-    source = docx("source.docx", p(delete("old") + insert("new")))
-    a, b = tmp_path / "a.docx", tmp_path / "b.docx"
-    assert convert(source, a) == convert(source, b)
-    with ZipFile(a) as one, ZipFile(b) as two:
-        assert {n: one.read(n) for n in one.namelist()} == {
-            n: two.read(n) for n in two.namelist()
-        }
-
-
-@pytest.mark.parametrize("report_target", ["source", "output"])
-def test_CF001_report_cannot_overwrite_document(docx, tmp_path, report_target):
-    source = docx("source.docx", paragraph("keep"))
-    target = tmp_path / "out.docx"
-    before = source.read_bytes()
-    report = source if report_target == "source" else target
-    with suppress(ValueError, SystemExit):
-        main([str(source), str(target), "--report", str(report)])
-    assert source.read_bytes() == before
-    if target.exists():
-        assert_integrity(target)
-
-
-def test_CF004_wrong_document_root_rejected(docx, tmp_path):
-    source = docx("source.docx", p(delete("gone") + insert("keep")))
-    rewrite(source, {"word/document.xml": b"<not-a-word-document/>"})
-    assert_rejects_without_output(convert, source, tmp_path / "out.docx")
-
-
-def test_CF005_nonstandard_header_path(docx, tmp_path):
-    name = "word/header-A.xml"
-    parts = {
-        name: story("hdr", p(delete("gone") + insert("keep"))),
-        "word/_rels/document.xml.rels": relationships(
-            [("header", "header", "header-A.xml", False)]
-        ),
-    }
-    body = (
-        paragraph("body")
-        + '<w:sectPr><w:headerReference w:type="default" r:id="header"/></w:sectPr>'
-    )
-    source = docx("source.docx", body, parts)
-    target = tmp_path / "out.docx"
-    convert(source, target)
-    assert_integrity(target)
-    assert xml_part(target, name).find(".//{" + W_NS + "}del") is None
+from docx_color_cli import ColoringError, color_revisions
 
 
 @pytest.mark.parametrize(
@@ -156,4 +77,12 @@ def test_CF014_invalid_package_is_rejected(docx, tmp_path, damage):
         warnings.filterwarnings(
             "ignore", message="Duplicate name:", category=UserWarning
         )
-        assert_rejects_without_output(convert, source, tmp_path / "out.docx")
+        accepted = docx("accepted.docx", paragraph("keep"))
+        target = tmp_path / "out.docx"
+        target.write_bytes(b"previous")
+        before = source.read_bytes(), accepted.read_bytes()
+        with pytest.raises(ColoringError) as error:
+            color_revisions(source, accepted, target)
+        assert error.value.code == "INVALID_DOCX"
+        assert target.read_bytes() == b"previous"
+        assert (source.read_bytes(), accepted.read_bytes()) == before

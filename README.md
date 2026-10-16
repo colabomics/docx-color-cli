@@ -1,288 +1,316 @@
 # docx-color-cli
 
-[![PyPI](https://img.shields.io/pypi/v/docx-color-cli)](https://pypi.org/project/docx-color-cli/)
-[![Python](https://img.shields.io/pypi/pyversions/docx-color-cli)](https://pypi.org/project/docx-color-cli/)
-[![CI](https://github.com/colabomics/docx-color-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/colabomics/docx-color-cli/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/colabomics/docx-color-cli/blob/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/docx-color-cli?label=pypi)](https://pypi.org/project/docx-color-cli/)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)
+[![CI](https://github.com/colabomics/docx-color-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/colabomics/docx-color-cli/actions)
+[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
-Accept tracked changes in Word documents and turn inserted text into permanent
-font colors.
+[简体中文](README.zh-CN.md) | English
 
-`docx-color-cli` converts a tracked DOCX into a new DOCX with insertions in red,
-unchanged text in black, and deleted content removed. It works directly with
-OOXML and keeps supported document structures and editable fields intact.
+---
 
-The project is under active development. Content fidelity takes priority over
-formatting and performance. Supported revisions are accepted; unsupported or
-ambiguous structures cause an error before the output is published. Compatibility
-with every Word document and identical rendering in Microsoft Word are not guaranteed.
+### Finished revising your manuscript? Now you have to color every change manually? 😩
 
-## Installation
+Responding to reviewers is already exhausting enough. You've finally finished revising your manuscript, only to realize you still need to track down every new sentence, paragraph, and equation—and turn them all red.
 
-Requires **Python 3.11+**. CI tests Python 3.11, 3.12 and 3.13 on Linux, macOS and
-Windows. The only runtime dependency is `lxml`; Microsoft Word is not required.
+**Surely there's a better use of your time.**
 
-Recommended: run directly with uv:
+Meet **docx-color-cli**! It uses Word's tracked changes to find newly added content and color it in your final document.
+
+**One command. All the red you need. 🔴**
+
+## ✨ Why docx-color-cli?
+
+Picture this:
+
+You've spent weeks responding to reviewers.
+
+Reviewer #2 asked for more experiments, more analyses, and a few extra equations. You've finally addressed everything.
+
+Just when you think you're ready to resubmit, the editor reminds you:
+
+**"Please highlight all changes in the revised manuscript."**
+
+And there you are, scrolling through Word, hunting down every addition...
+
+😵‍💫
+
+That's where `docx-color-cli` comes in.
+
+- 🔴 **Automatically colors additions** — No more hunting down changes and coloring them one by one.
+- 📄 **Keeps your document intact** — Text, equations, tables, references, and formatting stay where they belong.
+- ⚡ **One command does the job** — No complicated setup or endless clicking.
+- 🔓 **Free, open source, and local** — Your manuscript stays on your computer.
+
+**Spend your time doing science, not fighting Word formatting.**
+
+## 🎬 See It in Action
+
+![docx-color-cli demo](assets/demo.gif)
+
+**Two Word documents. One command. Newly added text turns red! 🔴**
+
+Prepare a document with tracked changes (`change_tracked.docx`) and a copy with all changes accepted (`change_accepted.docx`). Then run:
 
 ```bash
-uvx docx-color-cli input.docx output.docx
+docx-color \
+  examples/change_tracked.docx \
+  examples/change_accepted.docx \
+  examples/change_colored.docx
 ```
 
-Alternatively, install the command in an isolated tool environment:
+**🎉 Done!**
+
+The tool automatically identifies additions and colors the text it can reliably locate in red. Unchanged content keeps its original formatting, while equations, tables, and references are preserved as much as possible.
+
+**Want to try it yourself?** Both example Word documents are included in the [`examples/`](examples/) directory. Just run the command above and see the magic happen!
+
+## 🚀 Three Steps. That's It.
+
+### Step 1: Install
+
+You'll need **Python 3.11 or newer**.
+
+Install with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv tool install docx-color-cli
-docx-color input.docx output.docx
-docx-color --help
-docx-color --version
 ```
 
-The `docx-color-cli` command is an alias for `docx-color`, allowing the package-name
-`uvx` invocation above. Both commands use the same implementation.
-
-With pip, use a Python 3.11+ virtual environment:
+Or install with pip:
 
 ```bash
 python -m pip install docx-color-cli
 ```
 
-To install an unreleased checkout, run `uv tool install .` in the repository.
+### Step 2: Prepare two Word documents
 
-[GitHub repository](https://github.com/colabomics/docx-color-cli) ·
-[PyPI package](https://pypi.org/project/docx-color-cli/) ·
-[Release procedure](https://github.com/colabomics/docx-color-cli/blob/main/RELEASE.md)
+You'll need **two versions of the same manuscript**.
 
-## Quick start
+**📄 `tracked.docx` — Your manuscript with tracked changes**
 
-```bash
-docx-color manuscript.docx manuscript_colored.docx
-```
+This is the document you've been editing with Microsoft Word's Track Changes feature.
 
-| Content in the original document | Output |
-| --- | --- |
-| Inserted text | Retained in red (`FF0000`) |
-| Unchanged text | Retained in black (`000000`) |
-| Deleted text | Removed |
-| Replaced text | Old text removed; replacement retained in red |
-| Supported moved text | Source removed; destination retained in red |
+**📄 `accepted.docx` — The same manuscript with all changes accepted**
 
-Supported revisions are accepted, leaving no unhandled revision markers in the
-published output. Existing text colors are intentionally replaced by these colors.
+Creating it is easy:
 
-Omit the output path to create `<input_stem>_colored.docx` beside the input:
+1. Open `tracked.docx` in Microsoft Word.
+2. Save a separate copy so your original stays untouched.
+3. Go to **Review → Accept → Accept All Changes**.
+4. Turn off Track Changes and save the copy as `accepted.docx`.
 
-```bash
-docx-color manuscript.docx
-```
+Make sure both files represent the same revision. Don't make additional content edits to one file after creating the accepted copy.
 
-Write conversion statistics to a JSON report:
+**A quick heads-up:** `docx-color-cli` doesn't accept revisions for you. You'll need to do that in Word first.
+
+### Step 3: Run!
+
+Open your terminal and type:
 
 ```bash
-docx-color manuscript.docx manuscript_colored.docx --report report.json
+docx-color tracked.docx accepted.docx colored.docx
 ```
 
-Choose different insertion and unchanged-text colors:
+**🎉 Done!**
+
+You'll get a new file:
+
+`colored.docx`
+
+Newly inserted content that can be reliably identified will be colored red.
+
+Your original two Word documents remain untouched.
+
+The whole workflow:
+
+**📝 Tracked manuscript + ✅ Accepted manuscript → 🔴 Colored manuscript**
+
+## 🎨 Not a Fan of Red? Pick Another Color!
+
+Red is the default, but maybe your journal prefers blue.
+
+No problem:
 
 ```bash
-docx-color manuscript.docx manuscript_colored.docx --inserted-color 0000FF --unchanged-color 000000
+docx-color tracked.docx accepted.docx colored.docx --color 0000FF
 ```
 
-The equivalent short options are `-ic` and `-uc`:
+You can use any six-digit hexadecimal color code. Just leave out the `#`.
+
+## 📋 What Happens to My Manuscript?
+
+| Content | What happens |
+|---|---|
+| ✏️ Newly added text | Automatically colored red |
+| 📄 Unchanged text | Original color and formatting preserved |
+| 🗑️ Deleted text | Already removed when you accepted the changes |
+| ∑ Mathematical equations | Supported newly inserted equations are colored |
+| 📊 Tables and images | Content and structure preserved |
+| 📚 References | Citation fields and hyperlinks preserved |
+
+Here's the important part:
+
+**The tool doesn't rebuild your manuscript. It works directly with your accepted Word document and changes the colors of identified additions.**
+
+Your equations stay editable. Your references stay where they belong.
+
+And if something is too ambiguous to identify safely, the tool leaves it alone rather than making a wild guess.
+
+## 📊 How Do I Know If Anything Was Missed?
+
+After processing, the terminal tells you how things went.
+
+You might see one of three statuses:
+
+**✅ SUCCESS — All checks passed**
+
+Your document was created and validated, with no unresolved coloring candidates reported.
+
+**🟡 PARTIAL — Almost there!**
+
+Your document was created, but some complex changes couldn't be colored reliably, or there was a problem saving the optional report.
+
+The tool will tell you what happened. Open the document in Word and give those changes a quick look.
+
+**❌ FAILED — Something went wrong**
+
+Processing stopped before a new output document was published. If an output file already existed, it is preserved.
+
+Want a more detailed report? Add `--report`:
 
 ```bash
-docx-color manuscript.docx manuscript_colored.docx -ic 0000FF -uc 000000
+docx-color tracked.docx accepted.docx colored.docx --report result.json
 ```
 
-## Example:
+The report contains processing counts and validation results, not your manuscript text.
 
-Try the included, four-page synthetic manuscript (approximately 1,450 words after acceptance).
-
-Download the [tracked input](https://github.com/colabomics/docx-color-cli/raw/refs/heads/main/examples/tracked.docx) and
-[converted output](https://github.com/colabomics/docx-color-cli/raw/refs/heads/main/examples/colored.docx), or run from the checkout:
-
-Four fictional authors contribute **124 revision markers: 73 insertions and 51
-deletions** across the title, summary, results, discussion, Methods and table.
-The converted document preserves two equations and editable citation/hyperlink fields.
+Need help?
 
 ```bash
-uv run docx-color examples/tracked.docx examples/colored.docx
+docx-color --help
 ```
 
-![Animated workflow showing tracked edits, the conversion command and red-and-black output](https://raw.githubusercontent.com/colabomics/docx-color-cli/main/assets/demo.gif)
-
-To compare against a separate DOCX manually saved after **Accept All Changes** in
-Microsoft Word, enable reference validation:
+Want to check your installed version?
 
 ```bash
-docx-color manuscript.docx manuscript_colored.docx --reference accepted_in_word.docx
+docx-color --version
 ```
 
-Any comparison failure prevents publication and preserves an existing output.
-Comparison checks logical text, structure, editable fields, equations and linked
-resources, ignoring font colors and equivalent run splitting. By default,
-`--reference` uses **bounded semantic comparison**: it also recognizes bookmark ID
-renumbering (names and ranges must match), view zoom, drawing edit identifiers, and
-supported editable HTTP(S) hyperlink field/element representations, including a
-single trailing `\h` visit-history switch. Applied equivalences are reported on
-stderr and in the JSON report's `reference_validation` record, along with the mode
-and checked parts. Normalization affects comparison only, never the saved DOCX.
+> 💡 **A tip for automation:** Exit code `0` means a validated DOCX was created, even if coloring was only PARTIAL. If your script needs to confirm completeness, check `overall_status` and `coloring_status` in the JSON report.
 
-Text, meaningful whitespace, structure, field results, link targets, images and
-font signatures remain checked. Unknown field switches and other unrecognized
-differences still fail. For conservative representation comparison, use:
+## ❓ You Might Be Wondering...
 
-```bash
-docx-color manuscript.docx manuscript_colored.docx --reference accepted_in_word.docx --reference-mode strict
+### Can it color Word equations?
+
+**Yes!**
+
+The tool supports many common additions to native Word equations, including variables, fractions, summation symbols, and other mathematical expressions.
+
+And the best part? Your equations remain editable in Word.
+
+Some particularly complicated changes inside equations may still need a manual touch.
+
+### Will it break my Zotero citations?
+
+The tool works from your accepted Word document, preserving citation fields, hyperlinks, and other existing structures.
+
+It doesn't regenerate your references or turn Zotero fields into plain text.
+
+However, if a citation contains complicated tracked changes, some inserted text may not be colored automatically.
+
+**A quick check of important references before submission is always a good idea.**
+
+### Will it mess up my Word formatting?
+
+The guiding principle is simple:
+
+**Change the color of added content. Leave everything else alone.**
+
+The tool checks that the generated document preserves the content and structure of your accepted document.
+
+That said, Word can be surprisingly complicated, and no tool can promise perfect handling of every possible document.
+
+So yes, give your final manuscript a quick look before submitting it.
+
+### Are my original documents safe?
+
+**Absolutely! Your input files are not modified.**
+
+`tracked.docx` and `accepted.docx` are only used as inputs.
+
+The tool creates a separate `colored.docx`.
+
+Just remember that running the same command again will replace an existing output file if the conversion succeeds. Don't use your only copy of an important document as the output.
+
+### Does my manuscript get uploaded anywhere?
+
+**Nope. Nowhere!**
+
+Everything happens locally on your computer.
+
+No external document-processing service. No manuscript uploads.
+
+Especially useful when you're working on unpublished research.
+
+### What if some additions aren't colored?
+
+Word's tracked changes can get surprisingly complicated.
+
+A paragraph might have been edited several times. Text might have been moved around. An equation might contain nested changes. Or the two documents might not match closely enough.
+
+When that happens, `docx-color-cli` plays it safe.
+
+**If it can identify an addition confidently, it colors it. If it can't, it leaves it alone and tells you what's unresolved.**
+
+Better to miss a tricky insertion than accidentally color text that was never changed.
+
+## ⚠️ A Few Things to Keep in Mind
+
+The tool can save you a lot of repetitive work, but there are a few things worth remembering:
+
+- Both input files must come from the same Word document.
+- Remember to accept all tracked changes in Word before running the tool.
+- Some complex revisions, field changes, and mathematical structures may not be supported.
+- Strict OOXML documents are not currently supported.
+- Exceptionally large or highly compressed DOCX files may be rejected for safety reasons.
+- Avoid editing the input or output files while the tool is running. It's best to close the output document in Word first.
+- Give your DOCX output and JSON report clearly different filenames. Don't distinguish them by capitalization alone.
+- **Always check the final document before sending it back to the journal.**
+
+Tested on macOS, Ubuntu, and Windows with Python 3.11, 3.12, and 3.13.
+
+## 🐍 Want to Use It in Python?
+
+If you'd like to automate manuscript processing in your own Python scripts, you can use the Python API:
+
+```python
+from docx_color_cli import color_revisions
+
+result = color_revisions(
+    "tracked.docx",
+    "accepted.docx",
+    "colored.docx",
+    color="FF0000",
+)
+
+print(result["overall_status"])
 ```
 
-There is no automatic fallback between modes. Neither mode verifies the reference's
-provenance or identical page layout. No Word automation is used.
+The API also provides error information to help your scripts handle unsuccessful conversions.
 
-## Check without publishing
+## ❤️ Let's Make It Better!
 
-```bash
-docx-color manuscript.docx --check
-```
+If this little tool saves you a few hours of clicking around in Word, then it's done its job. 😄
 
-Check mode runs the same conversion, retention, package-integrity and optional
-`--reference` checks using disposable temporary storage. It leaves the input and
-existing outputs untouched and removes the temporary DOCX. Exit code 0 means the
-input passed the supported conversion checks; invalid or unsupported input exits
-nonzero. This is not a Word rendering or complete schema check. `--check` cannot
-be combined with an output path or `--report`.
+Found a bug? Have an idea? Encountered a particularly stubborn tracked change?
 
-Unsupported revisions are always rejected; there is no permissive mode.
+Feel free to [open an issue](https://github.com/colabomics/docx-color-cli/issues) or submit a pull request!
 
-## Command-line reference
+If you're sharing a problematic document, please use a minimal example that doesn't contain private or unpublished manuscript content.
 
-```text
-docx-color [-h] [--version] [--inserted-color RGB] [--unchanged-color RGB] [--report REPORT]
-           [--reference REFERENCE] [--reference-mode {semantic,strict}] [--check] input [output]
-```
+And if you find the tool useful, a ⭐ on GitHub is always appreciated!
 
-| Argument | Description | Default |
-| --- | --- | --- |
-| `input` | Source DOCX containing tracked changes | Required |
-| `output` | Destination DOCX | `<input_stem>_colored.docx` |
-| `-ic`, `--inserted-color` | Color for inserted text, as six hexadecimal digits without `#` | `FF0000` |
-| `-uc`, `--unchanged-color` | Color for unchanged text, in the same format | `000000` |
-| `--reference` | Word-accepted DOCX; mismatches block output publication | No external comparison |
-| `--reference-mode` | `semantic` or `strict`; requires `--reference` | `semantic` |
-| `--report` | Path for a JSON conversion-statistics report | No report file |
-| `--check` | Validate input and conversion support without publishing output | Disabled |
-| `-h`, `--help` | Show command help | — |
-| `--version` | Show the installed package version | — |
+## 📄 License
 
-Successful conversion prints the output path and statistics. Errors return a
-nonzero exit status. The JSON report contains operation counts, not a certification
-of equivalence with Microsoft Word.
-
-## Supported documents and revisions
-
-- Text insertions, deletions and replacements, including split runs and nested
-  insertion/deletion revisions.
-- Supported paragraph-mark insertions and deletions, including adjacent paragraph
-  merges with different properties. The final surviving paragraph mark determines
-  the merged paragraph's properties.
-- Paired inline, whole-paragraph and cross-paragraph moves within the same document
-  part, subject to structural boundary checks.
-- Text and supported structural changes in tables: cell insertions, cell deletions
-  consistent with the explicit final grid, explicit vertical merge-state changes,
-  and row edits with valid surviving merge ownership. Row/cell insertion marks
-  do not recolor unchanged text without a text-level insertion revision.
-- Mathematical run revisions, including supported mixed-stream splitting and
-  inherited properties, nested revisions, inserted equation controls and fully
-  deleted equation objects. Partially retained objects are
-  never discarded merely because their control is marked deleted.
-- Supported formatting revisions, retaining current properties and removing
-  historical snapshots, including `tblPrExChange`.
-- Shared Strict/Transitional OOXML revision vocabulary, preserving each XML part's
-  namespace dialect; no general Strict-to-Transitional format conversion.
-- Revisions within independently processable AlternateContent alternatives, keeping
-  both Choice and Fallback; complete custom XML/content-control markup ranges.
-
-The converter preserves supported hyperlinks, bookmarks, images, OMML equations,
-content controls, headers, footers, footnotes and endnotes. Word fields, cross-references
-and Zotero citation/bibliography fields remain editable rather than being flattened
-into plain text. Fields are preserved, not recalculated. Literal REF/PAGEREF/NOTEREF
-and internal hyperlink dependencies are checked for newly missing or ambiguous
-bookmark targets. Existing broken references are preserved, not repaired. Dynamic
-or conditional reference changes that cannot be resolved safely are rejected.
-
-Images proven unused after revision acceptance are cleaned up without recompressing
-retained images. Equation containers made empty by accepted deletions and comments
-that lose their final active reference are cleaned up with dependency checks.
-
-## Limitations
-
-The converter targets the final content shown in Word's **No Markup** view.
-That view is not equivalent to simply removing revision tags, and complete Word
-compatibility has not been established.
-
-The following cases are currently rejected or unsupported:
-
-- Unknown revision types, mixed namespace dialects within a part, and unsupported
-  extension semantics.
-- Unpaired moves, moves nested inside other moves, cross-cell/part moves, and
-  ranges sharing moved content. Moves nested inside ordinary insertions/deletions
-  are supported.
-- Deleting section boundaries, merging across cells/tables, and unsupported
-  terminal paragraph-mark deletions. Merging into a paragraph that retains its
-  section boundary is supported.
-- Cell deletions requiring inferred horizontal span/grid repair; vertical merge
-  edits requiring ownership transfer or reconciliation of live continuation content.
-- Partial/overlapping custom XML tag ranges, custom XML move ranges, cross-branch
-  fields/ranges, conflicting math properties and equation-control deletions with
-  retained or unrecognized arguments.
-- Comment cleanup with unresolved dependencies, including surviving threaded replies.
-
-Internal checks cover ZIP/XML integrity, relationships, field boundaries, supported
-math argument cardinalities, table grids, revision removal and retention invariants.
-They are not a complete OOXML schema validator or a rendering engine.
-
-The independent comparator is also available as
-`docx_color_cli.validation.validate_docx(output, reference)`. Its optional
-`semantic=True` comparison recognizes a small, tested set of representation
-alternatives and reports each normalization. This independent API keeps its strict
-default; the conversion APIs and CLI select `semantic=True` by default.
-The private academic sample's body passes bounded semantic comparison, while full
-comparison still detects font-signature differences. These remain deliberately
-unignored. This is evidence for the tested sample, not a guarantee for all documents.
-
-## Python API and diagnostics
-
-`docx_color_cli.cli` exposes `modify(root, stats, original, added)`,
-`convert(source, target, *, black, red, reference, reference_mode="semantic")` and
-`convert_output(source, target, *, black, red, reference, reference_mode="semantic")`, retaining their existing
-color defaults. They no longer accept a `strict` parameter. `check(source, *,
-black, red, reference, reference_mode="semantic")` runs the same checks without publication.
-
-Expected conversion failures raise `ConversionError` from `docx_color_cli.errors`
-(a `ValueError` subclass). Diagnostics expose `part`, `revision_type`, `element`,
-`xpath`, `line` and `cause_type` when available; unavailable fields are `None`.
-`UnsupportedRevisionError` identifies unsupported revisions or associated structures.
-`PublicationError` also exposes `destination` and `output_published`, so callers
-can distinguish a failed DOCX publication from a later report failure. Wrapped
-errors retain their original exception as `__cause__`. CLI errors go to stderr
-with a nonzero exit code and no ordinary traceback.
-
-## File safety
-
-The input document is preserved. Input, output, reference and report paths must identify
-different files; checks include resolved paths, symbolic links and existing hard
-links.
-
-Output is written to a temporary file beside the destination and checked before
-atomic replacement. Conversion or validation failure preserves an existing output.
-**Successful conversion replaces an existing destination file.**
-
-The optional report is staged before publication and published **after** the
-validated DOCX. If DOCX publication fails, an existing output and report remain
-unchanged, and no success message is printed. These are separate atomic operations:
-if report publication fails after the DOCX is published, the CLI exits nonzero
-and explicitly states that the DOCX was saved but the report failed. The previous
-report, if any, remains unchanged. Temporary files are cleaned up.
-
-## License
-
-Licensed under the [MIT License](https://github.com/colabomics/docx-color-cli/blob/main/LICENSE).
+Released under the [MIT License](LICENSE).

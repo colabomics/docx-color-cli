@@ -1,165 +1,110 @@
-# Releasing docx-color-cli
+# Release validation and explicit publication
 
-`pyproject.toml` is the single source of truth for the version. Releases use GitHub
-Actions and PyPI Trusted Publishing (OIDC), with no PyPI API token.
+Ordinary source pushes and pull requests run CI only. **They cannot publish.**
+The `Publish` workflow now accepts only a deliberate `workflow_dispatch` event
+on `main`, with an exact version and an upload request that defaults to **false**.
+It runs the complete nine-job OS/Python matrix before building distributions.
 
-## Normal release
+Release artifacts must match the reviewed 1.1.0 source and package metadata.
+Building or validating artifacts does not authorize publication. Commits, pushes,
+tags and publication require explicit authorization.
 
-After the one-time setup below, update only the version in `pyproject.toml`, for
-example from `0.3.0` to `0.4.0`, then commit and push:
+## Required owner configuration (not performed by local validation)
 
-```bash
-git add pyproject.toml
-git commit -m "chore: release v0.4.0"
-git push origin main
-```
+Before enabling any upload, a repository/PyPI owner must:
 
-No tag, manual workflow dispatch, or manual PyPI upload is needed. For a version-only
-change, CI uses `uv sync` to refresh the root project's lock metadata in its
-checkout; you do not need to edit a second version constant or commit a generated
-lock update. Dependency changes should still include an updated `uv.lock`.
+1. Review the workflow and source changes; protect `main` with required PR review
+   and all nine CI checks. Restrict repository write/admin access and review all
+   changes to publishing workflows and scripts.
+2. Create or inspect the GitHub environment **pypi**. Restrict deployment branches
+   to **main**; configure trusted required reviewers, prevent self-review and
+   disable administrator bypass where available. If the repository plan cannot
+   enforce the required protections, keep uploads disabled.
+3. Verify the existing PyPI project's Trusted Publisher against this exact tuple:
 
-The `Publish` workflow runs on every push to `main`. It reads the current and
-pre-push versions with Python `tomllib` and compares Git tags and nonempty PyPI
-releases with `packaging.version.Version` (PEP 440):
+   | Field | Required value |
+   | --- | --- |
+   | Owner | `colabomics` |
+   | Repository | `docx-color-cli` |
+   | Workflow filename | `publish.yml` |
+   | Environment | `pypi` |
 
-| State | Action |
-| --- | --- |
-| Version unchanged, no incomplete release | Run normal CI; do not publish or tag |
-| Version increased and absent from Git/PyPI | Validate, build, publish, verify, tag and create a release |
-| Version lower than the previous main version or any known release | Fail; publish nothing |
-| Version already on PyPI | Never upload duplicate artifacts; skip or recover missing GitHub metadata |
-| Tag already exists but PyPI version is absent | Skip; report the existing tag, investigate manually |
-| First push with no previous commit | Skip initial publication; a later version bump is required |
+   An owner must explicitly authorize adding/changing a publisher if one is not
+   already configured. This phase does not register or activate one. The workflow
+   uses OIDC; it does not reference a long-lived PyPI token or password. Existing
+   repository credentials were not inspected, deleted or changed.
+4. Only after checking protections and successful cross-platform results, set
+   repository variable **PYPI_RELEASE_ENABLED** to the exact string `true`.
+   Leave it absent/false for validation-only operation. This extra gate does not
+   replace environment approval or repository access controls.
 
-Adding these workflows alone does not publish the unchanged current version.
-Invalid versions and local-version identifiers are rejected. Prereleases use PEP
-440 ordering and are marked as prereleases on GitHub.
+Manual dispatch requires repository write access, but that is not sufficient
+protection by itself. GitHub environment reviewers and branch restrictions must
+be configured in repository settings; a YAML environment name does not prove
+those controls exist. See [GitHub manual workflow access](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
+and [environment protections](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
 
-## Validation and publication order
+PyPI recommends isolating OIDC upload from build execution and using dedicated
+protected environments. Here only the upload job gets `id-token: write`; it has
+just artifact download and the official upload action, with no checkout or build.
+See [PyPI's security model](https://docs.pypi.org/trusted-publishers/security-model/)
+and [Trusted Publisher configuration](https://docs.pypi.org/trusted-publishers/adding-a-publisher/).
 
-1. Detect the version and reject downgrades. PyPI/network errors fail closed.
-2. Run the reusable CI workflow: Python 3.11–3.13 on Linux/macOS/Windows, Ruff lint
-   and formatting, complete pytest suite, package build, strict Twine metadata
-   checks and clean-wheel installation/conversion.
-3. Record the source commit in a generated `release-provenance.json`, build the
-   wheel and sdist, validate metadata and smoke-test the release wheel.
-4. Transfer those exact distributions to the dedicated publishing job.
-5. Recheck PyPI immediately before upload to avoid duplicating a version published
-   during validation. Publish using `pypa/gh-action-pypi-publish@release/v1` and OIDC in environment
-   `pypi`. This job alone receives `id-token: write`.
-6. Verify PyPI contains both distributions. For a fresh publication, compare every
-   filename and SHA-256 against the tested artifacts. Download the sdist from PyPI,
-   verify its hash, and read its source commit without extracting the archive.
-7. Confirm that commit belongs to `main` and has the same project version.
-8. Create and push annotated tag `v<version>` at that source commit, then create a
-   GitHub Release with generated commit-history notes, the PyPI link and install
-   commands. Only this completion job receives `contents: write`.
+## Future intentional release procedure
 
-Publication and tagging happen in the same workflow execution. The workflow does
-not depend on tags created by `GITHUB_TOKEN` triggering another workflow. Releases
-are serialized with concurrency group `pypi-release`, without canceling an active
-release. Normal push/PR CI has read-only permissions and cannot publish.
+After separate authorization to release a reviewed version:
 
-GitHub may replace a queued concurrency run with a newer queued run. If several
-version bumps are pushed rapidly, inspect the Actions history; the pipeline may
-publish only the latest queued version. Do not stack release bumps before the
-previous release completes.
+1. Obtain passing macOS, Ubuntu and Windows checks on Python 3.11, 3.12 and 3.13
+   for the exact source commit. Confirm privacy, benchmark and installation checks.
+2. An authorized maintainer opens **Actions → Publish → Run workflow**, selects
+   `main` and enters the exact version from the reviewed `pyproject.toml`.
+3. Leave `publish` false for build-only validation. A dry run does not request
+   OIDC, upload, create tags or create GitHub Release metadata.
+4. For an explicitly authorized upload, select `publish` true. The build refuses
+   a mismatched version, an already published version or a downgrade. Network
+   failures are not interpreted as permission to upload. The repository enable
+   variable and independent **pypi** environment approval are both required.
+5. Review the exact source SHA and validated artifacts before environment approval.
+   Never approve an unexpected workflow or a different source revision.
 
-## One-time PyPI configuration
+The workflow no longer automatically creates Git tags or GitHub Releases. Those
+are separate intentional actions. Do not run `scripts/release.py github` as a
+validation command; it is a retained maintenance tool that mutates remote metadata.
+Legacy automatic detection/recovery helpers remain tested but are not on the
+workflow's trigger path.
 
-Configure a Trusted Publisher in the existing project's **Publishing** settings,
-or create a **pending publisher** in your PyPI account if the project does not yet
-exist:
+## Interrupted or failed publication
 
-| PyPI field | Value |
-| --- | --- |
-| Project name (pending publisher) | `docx-color-cli` |
-| Owner | `colabomics` |
-| Repository | `docx-color-cli` |
-| Workflow filename | `publish.yml` |
-| Environment | `pypi` |
+DOCX publication and package publication are separate concerns. For package release:
 
-You must own the existing PyPI project, or be able to register that project name.
-Do not add `PYPI_API_TOKEN` or a publishing password to GitHub secrets. The
-publisher workflow must match these settings exactly. See PyPI's official
-[Trusted Publisher setup](https://docs.pypi.org/trusted-publishers/adding-a-publisher/)
-and [publishing guidance](https://docs.pypi.org/trusted-publishers/using-a-publisher/).
+- Validation/build failure: no upload is authorized.
+- Disabled repository gate: build artifacts may exist, but the upload job is skipped.
+- Environment approval/identity failure: inspect the environment and exact publisher
+  tuple. Do not add an API token as a workaround.
+- Upload interruption or duplicate-version race: assume publication may be partial;
+  inspect PyPI and the run's retained distributions before any retry. Do not blindly
+  rebuild/upload the same version, use `skip-existing`, overwrite published files,
+  or move tags. A new version may be necessary after owner review.
 
-## One-time GitHub configuration
+Artifacts are retained for 30 days. Concurrency group `pypi-release` serializes
+release requests without canceling an active release. Repository administrators
+can change workflows/protections; no YAML can defend against a malicious owner.
+Action version tags are still trusted upstream references, not pinned commit SHAs.
 
-- Enable Actions and allow the official `actions/*` actions plus
-  `pypa/gh-action-pypi-publish`.
-- Create repository environment **pypi** and restrict deployment branches to
-  **main** (do not allow arbitrary branches or tags).
-- For fully automatic releases, do not require a manual reviewer on that
-  environment. Adding reviewers intentionally turns publication into an approval
-  step.
-- Permit the workflow's scoped OIDC permission and `contents: write` for the
-  GitHub completion job. No personal access token is required.
-- Ensure repository tag rules allow GitHub Actions to create `v*` tags. The
-  workflow will not force-push or bypass a rule automatically.
-- Protect `main` and require all CI matrix checks before merging; review changes
-  to workflows and release scripts carefully. No `pull_request_target` workflow
-  is used.
-
-The regular CI workflow and release validation may both run on a release commit.
-The release uses its own reusable CI dependency, so unrelated or stale CI results
-cannot authorize publication.
-
-## Diagnosing failures and partial releases
-
-Open **Actions → Publish → the failing run** and read the job log and summary.
-Fix the cause, then choose **Re-run all jobs** so detection observes current Git
-and PyPI state again. Re-running only a failed publish job can reuse an old
-`publish` decision and is not the recommended recovery path.
-
-- **Tests/lint/build/metadata/smoke failure:** no publication occurs. Fix the issue
-  and rerun, or push the fix and rerun the original release run after ensuring its
-  source is suitable. If the fix changes source code, use a new version bump to
-  release the corrected commit; an ordinary unchanged-version push does not
-  initiate a new publication.
-- **OIDC rejection:** check the exact owner, repository, `publish.yml`, environment
-  and PyPI project ownership; then rerun all jobs.
-- **PyPI published, tag/release missing:** rerun all jobs. Detection selects
-  recovery, reruns CI, skips upload, and reads the original source commit from the
-  published sdist. Missing GitHub metadata is created at that commit, even if
-  `main` has advanced with the same version. Existing tags/releases are never
-  overwritten or deleted. Verification/tagging failure is reported as a partial
-  release, not full success.
-- **Only some artifacts reached PyPI:** automatic recovery refuses an incomplete
-  wheel/sdist pair. An owner must inspect the retained `distributions` workflow
-  artifact and PyPI files. Do not blindly upload or rebuild a released version;
-  the straightforward recovery is to fix the issue and release a new version.
-- **Artifacts differ from the validated build, provenance is missing, or a tag
-  points elsewhere:** automatic completion refuses. Inspect the original run,
-  published artifacts and source history manually. Legacy releases without a
-  provenance record require an owner to establish the original commit before
-  manually creating missing metadata. Never move an existing tag automatically.
-- **PyPI version not immediately visible:** verification retries lookup for about
-  a minute. If it still fails, publication may have succeeded; rerun all jobs to
-  verify and recover.
-- **Network/authentication/rate-limit errors:** the workflow stops. A failed
-  request is never interpreted as an unpublished version.
-
-Workflow artifacts are retained for 30 days. Once both PyPI and GitHub metadata
-exist, rerunning the workflow exits successfully without changing either.
-
-## Local checks
+## Local offline checks
 
 ```bash
 uv sync
-uv run pytest
+uv run pytest -q
 uv run ruff check .
 uv run ruff format --check .
 uv build
-uv run twine check --strict dist/*
-uv run python scripts/smoke_wheel.py dist/*.whl
+uv run twine check --strict dist/docx_color_cli-1.1.0-py3-none-any.whl dist/docx_color_cli-1.1.0.tar.gz
+uv run python scripts/smoke_wheel.py dist
 ```
 
-Run the smoke test with only one target wheel (or pass its exact path if `dist/`
-contains older builds). It installs the wheel into a new temporary environment,
-runs `docx-color --help` and `--version` outside the checkout, verifies the import
-comes from that environment, and compares installed and development conversion
-results. Local builds do not publish or create release tags. Do not run
-`scripts/release.py github` locally as a validation command: it mutates GitHub.
+Use a build directory containing one wheel and one sdist; substitute filenames
+only after a separately approved version change. The smoke script accepts a
+build directory so Windows does not depend on shell wildcard expansion. It creates
+an isolated environment and runs both commands outside the checkout. These local
+checks do not contact an upload endpoint, publish, tag, push or create a release.
