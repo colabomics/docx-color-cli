@@ -242,8 +242,8 @@ def complete_github(version, commit):
     notes.write_text(
         f"PyPI: https://pypi.org/project/{PROJECT}/{version}/\n\n"
         "Install:\n```bash\nuv tool install docx-color-cli\n```\n\n"
-        "Or run without permanent installation:\n```bash\n"
-        "uvx docx-color-cli input.docx output.docx\n```\n"
+        "After saving the accepted copy in Word:\n```bash\n"
+        "docx-color tracked.docx accepted.docx colored.docx\n```\n"
     )
     command = [
         "gh",

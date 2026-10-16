@@ -13,6 +13,16 @@ def xml_part(path, name="word/document.xml"):
         return etree.fromstring(archive.read(name))
 
 
+def xml_tree(node):
+    """Strict expanded-name tree, including attributes, text and child tails."""
+    return (
+        node.tag,
+        tuple(sorted(node.attrib.items())),
+        node.text or "",
+        tuple((xml_tree(c), c.tail or "") for c in node),
+    )
+
+
 def text(node):
     fragments = []
     for child in node.iter():
@@ -48,23 +58,6 @@ def assert_segments(root, expected):
 def assert_integrity(path):
     result = inspect_docx(path)
     assert result.ok, "\n".join(result.issues)
-
-
-def assert_rejects_without_output(convert, source, target, **kwargs):
-    """Expect a specific safe refusal; verify artifacts even if it fails to refuse."""
-    before = source.read_bytes()
-    existing = target.read_bytes() if target.exists() else None
-    try:
-        convert(source, target, **kwargs)
-    except ValueError as exc:
-        assert str(exc)
-    else:
-        raise AssertionError("converter silently accepted unsupported content")
-    assert source.read_bytes() == before
-    if existing is not None:
-        assert target.read_bytes() == existing
-    else:
-        assert not target.exists()
 
 
 def xml_without_font_colors(node):

@@ -1,6 +1,7 @@
 """Install a wheel in a clean venv and compare installed/development conversion."""
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -11,19 +12,27 @@ from email.parser import BytesParser
 from pathlib import Path
 from zipfile import ZipFile
 
-from docx_color_cli.cli import convert
+from docx_color_cli import color_revisions
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 M = "http://schemas.openxmlformats.org/officeDocument/2006/math"
 
 
-def fixture(path):
+def fixture(path, *, accepted=False):
+    inserted = "<w:r><w:t>inserted</w:t></w:r>"
+    if not accepted:
+        inserted = '<w:ins w:id="2">' + inserted + "</w:ins>"
+    deleted = (
+        ""
+        if accepted
+        else '<w:del w:id="3"><w:r><w:delText>deleted</w:delText></w:r></w:del>'
+    )
     document = f'''<w:document xmlns:w="{W}" xmlns:r="{R}" xmlns:m="{M}"><w:body><w:p>
 <w:bookmarkStart w:id="1" w:name="target"/>
-<w:r><w:t>unchanged</w:t></w:r>
-<w:ins w:id="2"><w:r><w:t>inserted</w:t></w:r></w:ins>
-<w:del w:id="3"><w:r><w:delText>deleted</w:delText></w:r></w:del>
+<w:r><w:rPr><w:color w:val="123456"/></w:rPr><w:t>unchanged</w:t></w:r>
+{inserted}
+{deleted}
 <w:fldSimple w:instr=' ADDIN ZOTERO_ITEM CSL_CITATION {{"citationID":"synthetic"}} '><w:r><w:t>citation</w:t></w:r></w:fldSimple>
 <w:hyperlink r:id="link"><w:r><w:t>link</w:t></w:r></w:hyperlink>
 <m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>
@@ -50,6 +59,11 @@ def check_distributions(wheel, version):
     """Check release contents as well as build metadata; never ship private inputs."""
     with ZipFile(wheel) as archive:
         names = archive.namelist()
+        assert all(
+            n.split("/")[0] == "docx_color_cli"
+            or n.split("/")[0].endswith(".dist-info")
+            for n in names
+        )
         metadata_name = next(n for n in names if n.endswith(".dist-info/METADATA"))
         metadata = BytesParser().parsebytes(archive.read(metadata_name))
         assert metadata["Name"] == "docx-color-cli"
@@ -59,12 +73,70 @@ def check_distributions(wheel, version):
         assert metadata["Description-Content-Type"].split(";")[0] == "text/markdown"
         assert metadata.get_all("Requires-Dist") and metadata.get_payload().strip()
         assert "docx_color_cli/errors.py" in names
+        assert "docx_color_cli/engine.py" in names
+        assert "docx_color_cli/math_coloring.py" in names
+        runtime = [
+            n for n in names if n.startswith("docx_color_cli/") and n.endswith(".py")
+        ]
+        assert all(n.count("/") == 1 for n in runtime), (
+            "Production modules must be flat"
+        )
+        assert not any("_legacy" in n for n in runtime)
+        assert {Path(n).stem for n in runtime} == {
+            "__init__",
+            "api",
+            "cli",
+            "accepted",
+            "extract",
+            "projection",
+            "anchors",
+            "alignment",
+            "math_coloring",
+            "coloring",
+            "validation",
+            "engine",
+            "pair",
+            "errors",
+            "package",
+        }
         assert not any(n.endswith(".docx") or "/academic/" in n for n in names)
+        assert not any(
+            "/artifacts/" in n or "PRIVATE-" in n or n.endswith("_SUMMARY.json")
+            for n in names
+        )
     sdists = list(wheel.parent.glob("*.tar.gz"))
     assert len(sdists) == 1, "Pass a build directory containing exactly one sdist"
     with tarfile.open(sdists[0]) as archive:
         names = archive.getnames()
+        allowed = {
+            "src",
+            "tests",
+            "scripts",
+            ".github",
+            ".gitignore",
+            "README.md",
+            "README.zh-CN.md",
+            "RELEASE.md",
+            "LICENSE",
+            "pyproject.toml",
+            "uv.lock",
+            "PKG-INFO",
+            "release-provenance.json",
+        }
+        assert all(len(Path(n).parts) < 2 or Path(n).parts[1] in allowed for n in names)
+        runtime = [
+            n for n in names if "/src/docx_color_cli/" in n and n.endswith(".py")
+        ]
+        assert all(
+            n.split("/src/docx_color_cli/", 1)[1].count("/") == 0 for n in runtime
+        )
+        assert not any("_legacy" in n for n in runtime)
         assert not any(n.endswith(".docx") or "/academic/" in n for n in names)
+        assert not any(
+            "/artifacts/" in n or "PRIVATE-" in n or n.endswith("_SUMMARY.json")
+            for n in names
+        )
+        assert any(n.endswith("/README.zh-CN.md") for n in names)
         for required in (
             "RELEASE.md",
             "scripts/release.py",
@@ -83,7 +155,7 @@ def assert_installed_location(location, venv):
     )
 
 
-def smoke(wheel):
+def smoke(wheel, *, tracked_reference=None, accepted_reference=None):
     version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
     check_distributions(wheel, version)
     with tempfile.TemporaryDirectory(prefix="docx-wheel-") as directory:
@@ -122,17 +194,29 @@ def smoke(wheel):
             ).strip()
         )
         assert_installed_location(location, venv)
-        assert "--check" in run(command, "--help")
+        assert "ACCEPTED" in run(command, "--help") and "--check" not in run(
+            command, "--help"
+        )
         assert run(command, "--version").strip().endswith(" " + version)
         assert run(alias, "--version").strip().endswith(" " + version)
-        source, expected, actual = (
-            work / name for name in ("input.docx", "expected.docx", "actual.docx")
+        assert "ACCEPTED" in run(alias, "--help")
+        source, accepted, expected, actual = (
+            work / name
+            for name in ("input.docx", "accepted.docx", "expected.docx", "actual.docx")
         )
         fixture(source)
-        before = source.read_bytes()
-        convert(source, expected)
-        run(command, source, actual)
-        run(command, source, "--check")
+        fixture(accepted, accepted=True)
+        before = (source.read_bytes(), accepted.read_bytes())
+        color_revisions(source, accepted, expected)
+        report = work / "result.json"
+        run(command, source, accepted, actual, "--report", report)
+        assert json.loads(report.read_text())["overall_status"] == "SUCCESS"
+        run(
+            python,
+            "-I",
+            "-c",
+            "import sys, docx_color_cli; assert not any(n in sys.modules for n in ['pytest', 'ruff', 'main', 'docx_color_cli._legacy'])",
+        )
         with ZipFile(expected) as left, ZipFile(actual) as right:
             assert left.namelist() == right.namelist()
             assert all(left.read(name) == right.read(name) for name in left.namelist())
@@ -142,7 +226,7 @@ def smoke(wheel):
                 value in xml
                 for value in (
                     b"FF0000",
-                    b"000000",
+                    b"123456",
                     b"inserted",
                     b"ZOTERO_ITEM",
                     b"hyperlink",
@@ -150,11 +234,57 @@ def smoke(wheel):
                     b"oMath",
                 )
             )
-        assert source.read_bytes() == before
+        assert (source.read_bytes(), accepted.read_bytes()) == before
+        if tracked_reference is not None and accepted_reference is not None:
+            tracked_reference = tracked_reference.resolve()
+            accepted_reference = accepted_reference.resolve()
+            hashes = (tracked_reference.read_bytes(), accepted_reference.read_bytes())
+            local_output, installed_output = (
+                work / "local-private.docx",
+                work / "installed-private.docx",
+            )
+            local = color_revisions(tracked_reference, accepted_reference, local_output)
+            private_report = work / "private-report.json"
+            run(
+                command,
+                tracked_reference,
+                accepted_reference,
+                installed_output,
+                "--report",
+                private_report,
+            )
+            assert local_output.read_bytes() == installed_output.read_bytes()
+            installed = json.loads(private_report.read_text())
+            for key in (
+                "extraction",
+                "mapping",
+                "completeness",
+                "coloring",
+                "integrity",
+            ):
+                assert local[key] == installed[key]
+            assert (
+                tracked_reference.read_bytes(),
+                accepted_reference.read_bytes(),
+            ) == hashes
+            print(
+                "Clean wheel private-pair equivalence passed (no manuscript text logged)."
+            )
         print(f"Clean wheel smoke passed: {version}; installed import: {location}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("wheel", type=Path)
-    smoke(parser.parse_args().wheel)
+    parser.add_argument("--tracked", type=Path)
+    parser.add_argument("--accepted", type=Path)
+    args = parser.parse_args()
+    if bool(args.tracked) != bool(args.accepted):
+        parser.error("Supply both --tracked and --accepted, or neither")
+    wheel = args.wheel
+    if wheel.is_dir():
+        wheels = list(wheel.glob("*.whl"))
+        if len(wheels) != 1:
+            parser.error("Build directory must contain exactly one wheel")
+        wheel = wheels[0]
+    smoke(wheel, tracked_reference=args.tracked, accepted_reference=args.accepted)

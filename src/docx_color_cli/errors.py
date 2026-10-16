@@ -1,9 +1,24 @@
-"""Structured failures without document text in diagnostic context."""
+"""Safe public diagnostics, without XML, field codes or parser payloads."""
 
 from contextlib import contextmanager
 from zipfile import BadZipFile
 
 from lxml import etree
+
+
+class ColoringError(ValueError):
+    """A workflow failure before DOCX publication; auxiliary failures return warnings."""
+
+    def __init__(self, code, message):
+        super().__init__(message)
+        self.code = code
+        self.output_published = False
+        self.result = {
+            "overall_status": "FAILED",
+            "publication_status": "FAILED",
+            "coloring_status": "FAILED",
+            "error": {"code": code, "message": message},
+        }
 
 
 class ConversionError(ValueError):
@@ -34,21 +49,6 @@ class ConversionError(ValueError):
         if self.line:
             context.append(f"line {self.line}")
         return ": ".join([value for value in context if value] + [self.message])
-
-
-class UnsupportedRevisionError(ConversionError):
-    """A revision or associated structure cannot be accepted safely."""
-
-
-class PublicationError(ConversionError):
-    """Publication failed; output_published identifies a partial two-file result."""
-
-    def __init__(
-        self, message, *, destination, output_published=False, cause_type=None
-    ):
-        super().__init__(message, cause_type=cause_type)
-        self.destination = str(destination)
-        self.output_published = output_published
 
 
 @contextmanager
