@@ -19,8 +19,6 @@ Meet **docx-color-cli**! It uses Word's tracked changes to find newly added cont
 
 **One command. All the red you need. 🔴**
 
-> 📢 **Coming soon:** The new two-document workflow described below is currently available in the development version. The version on PyPI still uses the previous workflow.
-
 ## ✨ Why docx-color-cli?
 
 Picture this:
@@ -44,17 +42,28 @@ That's where `docx-color-cli` comes in.
 - ⚡ **One command does the job** — No complicated setup or endless clicking.
 - 🔓 **Free, open source, and local** — Your manuscript stays on your computer.
 
-Spend your time doing science, not fighting Word formatting.
+**Spend your time doing science, not fighting Word formatting.**
 
 ## 🎬 See It in Action
 
-<!-- Add an updated demo GIF showing the new two-document workflow here. -->
+![docx-color-cli demo](assets/demo.gif)
 
-**Before:** A manuscript full of tracked changes.
+**Two Word documents. One command. Newly added text turns red! 🔴**
 
-**After:** A clean, accepted manuscript with newly added content colored red.
+Prepare a document with tracked changes (`change_tracked.docx`) and a copy with all changes accepted (`change_accepted.docx`). Then run:
 
-Deleted text is already gone, and unchanged text keeps its original formatting.
+```bash
+docx-color \
+  examples/change_tracked.docx \
+  examples/change_accepted.docx \
+  examples/change_colored.docx
+```
+
+**🎉 Done!**
+
+The tool automatically identifies additions and colors the text it can reliably locate in red. Unchanged content keeps its original formatting, while equations, tables, and references are preserved as much as possible.
+
+**Want to try it yourself?** Both example Word documents are included in the [`examples/`](examples/) directory. Just run the command above and see the magic happen!
 
 ## 🚀 Three Steps. That's It.
 

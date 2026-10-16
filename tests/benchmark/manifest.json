@@ -874,5 +874,208 @@
       ]
     },
     "coordinates": "part / paragraph ordinal / Unicode code-point offset; controls: part / equation / control ordinal"
+  },
+  {
+    "id": "table_simple",
+    "description": "simple",
+    "truth_source": "helpers/table_cases.py",
+    "evidence": "INDEPENDENTLY_AUTHORED_SYNTHETIC_NOT_WORD_REFERENCE",
+    "tracked": "table_simple/tracked.docx",
+    "accepted": "table_simple/accepted.docx",
+    "expected_status": "SUCCESS",
+    "expected_fidelity": "PASS",
+    "omission_reason": null,
+    "expected_false_negatives": 0,
+    "inserted_math_controls": [],
+    "paragraphs": {
+      "word/document.xml": [
+        [
+          [
+            "12",
+            "INSERTED"
+          ]
+        ],
+        [
+          [
+            "keep",
+            "UNCHANGED"
+          ]
+        ]
+      ]
+    },
+    "coordinates": "part / paragraph ordinal / Unicode code-point offset; controls: part / equation / control ordinal"
+  },
+  {
+    "id": "table_multiple",
+    "description": "multiple",
+    "truth_source": "helpers/table_cases.py",
+    "evidence": "INDEPENDENTLY_AUTHORED_SYNTHETIC_NOT_WORD_REFERENCE",
+    "tracked": "table_multiple/tracked.docx",
+    "accepted": "table_multiple/accepted.docx",
+    "expected_status": "SUCCESS",
+    "expected_fidelity": "PASS",
+    "omission_reason": null,
+    "expected_false_negatives": 0,
+    "inserted_math_controls": [],
+    "paragraphs": {
+      "word/document.xml": [
+        [
+          [
+            "12",
+            "INSERTED"
+          ]
+        ],
+        [
+          [
+            "0.30",
+            "INSERTED"
+          ]
+        ]
+      ]
+    },
+    "coordinates": "part / paragraph ordinal / Unicode code-point offset; controls: part / equation / control ordinal"
+  },
+  {
+    "id": "table_repeated",
+    "description": "repeated",
+    "truth_source": "helpers/table_cases.py",
+    "evidence": "INDEPENDENTLY_AUTHORED_SYNTHETIC_NOT_WORD_REFERENCE",
+    "tracked": "table_repeated/tracked.docx",
+    "accepted": "table_repeated/accepted.docx",
+    "expected_status": "SUCCESS",
+    "expected_fidelity": "PASS",
+    "omission_reason": null,
+    "expected_false_negatives": 0,
+    "inserted_math_controls": [],
+    "paragraphs": {
+      "word/document.xml": [
+        [
+          [
+            "12",
+            "UNCHANGED"
+          ]
+        ],
+        [
+          [
+            "12",
+            "INSERTED"
+          ]
+        ],
+        [
+          [
+            "12",
+            "UNCHANGED"
+          ]
+        ]
+      ]
+    },
+    "coordinates": "part / paragraph ordinal / Unicode code-point offset; controls: part / equation / control ordinal"
+  },
+  {
+    "id": "table_property_siblings",
+    "description": "property_siblings",
+    "truth_source": "helpers/table_cases.py",
+    "evidence": "INDEPENDENTLY_AUTHORED_SYNTHETIC_NOT_WORD_REFERENCE",
+    "tracked": "table_property_siblings/tracked.docx",
+    "accepted": "table_property_siblings/accepted.docx",
+    "expected_status": "SUCCESS",
+    "expected_fidelity": "PASS",
+    "omission_reason": null,
+    "expected_false_negatives": 0,
+    "inserted_math_controls": [],
+    "paragraphs": {
+      "word/document.xml": [
+        [
+          [
+            "old ",
+            "UNCHANGED"
+          ],
+          [
+            "new",
+            "INSERTED"
+          ]
+        ]
+      ]
+    },
+    "coordinates": "part / paragraph ordinal / Unicode code-point offset; controls: part / equation / control ordinal"
+  },
+  {
+    "id": "table_nested",
+    "description": "nested",
+    "truth_source": "helpers/table_cases.py",
+    "evidence": "INDEPENDENTLY_AUTHORED_SYNTHETIC_NOT_WORD_REFERENCE",
+    "tracked": "table_nested/tracked.docx",
+    "accepted": "table_nested/accepted.docx",
+    "expected_status": "SUCCESS",
+    "expected_fidelity": "PASS",
+    "omission_reason": null,
+    "expected_false_negatives": 0,
+    "inserted_math_controls": [],
+    "paragraphs": {
+      "word/document.xml": [
+        [
+          [
+            "12",
+            "UNCHANGED"
+          ]
+        ],
+        [
+          [
+            "12",
+            "INSERTED"
+          ]
+        ],
+        [
+          [
+            "end",
+            "UNCHANGED"
+          ]
+        ],
+        [
+          [
+            "12",
+            "UNCHANGED"
+          ]
+        ]
+      ]
+    },
+    "coordinates": "part / paragraph ordinal / Unicode code-point offset; controls: part / equation / control ordinal"
+  },
+  {
+    "id": "table_merged",
+    "description": "merged",
+    "truth_source": "helpers/table_cases.py",
+    "evidence": "INDEPENDENTLY_AUTHORED_SYNTHETIC_NOT_WORD_REFERENCE",
+    "tracked": "table_merged/tracked.docx",
+    "accepted": "table_merged/accepted.docx",
+    "expected_status": "SUCCESS",
+    "expected_fidelity": "PASS",
+    "omission_reason": null,
+    "expected_false_negatives": 0,
+    "inserted_math_controls": [],
+    "paragraphs": {
+      "word/document.xml": [
+        [
+          [
+            "12",
+            "INSERTED"
+          ]
+        ],
+        [
+          [
+            "keep",
+            "UNCHANGED"
+          ]
+        ],
+        [],
+        [
+          [
+            "end",
+            "UNCHANGED"
+          ]
+        ]
+      ]
+    },
+    "coordinates": "part / paragraph ordinal / Unicode code-point offset; controls: part / equation / control ordinal"
   }
 ]

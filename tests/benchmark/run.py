@@ -21,11 +21,12 @@ from benchmark.cases import scenarios
 from docx_color_cli import ColoringError, color_revisions
 
 
-def evaluate(directory):
+def evaluate(directory, *, include_tables=True):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     rows = []
-    for scenario in scenarios():
+    corpus = scenarios(include_tables=include_tables)
+    for scenario in corpus:
         folder = directory / scenario.case.ident
         folder.mkdir(exist_ok=True)
         a = package(
@@ -137,7 +138,7 @@ def evaluate(directory):
     }
     result = {
         "label": "Synthetic benchmark results; not universal accuracy",
-        "scenarios": 30,
+        "scenarios": len(corpus),
         "valid_pairs_scored": len(scored),
         "invalid_pairs_excluded": 1,
         "metrics": totals,
@@ -155,6 +156,9 @@ def evaluate(directory):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--original", action="store_true", help="score the unchanged original 30 cases"
+    )
     args = parser.parse_args()
-    result = evaluate(args.output)
+    result = evaluate(args.output, include_tables=not args.original)
     print(json.dumps({k: v for k, v in result.items() if k != "cases"}, indent=2))

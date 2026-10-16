@@ -1,12 +1,13 @@
 # Public synthetic benchmark
 
-Thirty independently authored scenarios cover ordinary text, formatting, elementary
+Thirty-six independently authored scenarios cover ordinary text, formatting, elementary
 mathematics, generic fields and hyperlinks, tables, headers, notes, Unicode,
 ambiguous mapping and incompatible inputs. They are synthetic OOXML packages,
 not Microsoft Word reference documents. No private-document data is used.
 
 ```bash
 uv run python tests/benchmark/run.py --output .benchmark-output
+uv run python tests/benchmark/run.py --original --output .benchmark-output/original
 uv run pytest -q tests/test_benchmark.py
 ```
 
@@ -25,3 +26,8 @@ without publication and has no valid cross-document provenance denominator.
 Metrics apply only to these authored scenarios. They are not universal accuracy
 or Word-rendering guarantees. Mathematical controls are counted separately from
 characters. Private inputs and generated outputs are never included in archives.
+
+The original 30 scenarios retain their authored truth. Six additional table cases
+exercise property siblings, replacements, repeated values, merged and nested
+cells. Use `--original` to compare the unchanged corpus; expanded totals have a
+different denominator and are reported separately.

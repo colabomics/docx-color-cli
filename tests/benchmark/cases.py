@@ -8,6 +8,7 @@ from helpers.fidelity import W
 from helpers.field_cases import cases as field_cases
 from helpers.field_cases import relationships
 from helpers.math_cases import cases as math_cases
+from helpers.table_cases import cases as table_cases
 
 
 @dataclass
@@ -56,7 +57,7 @@ class Scenario:
         }
 
 
-def scenarios():
+def scenarios(*, include_tables=True):
     rows = []
     for c in ordinary_cases():
         if c.ident in {
@@ -209,4 +210,17 @@ def scenarios():
         )
     )
     assert len(rows) == 30
+    if include_tables:
+        selected = {
+            "table_simple",
+            "table_multiple",
+            "table_repeated",
+            "table_merged",
+            "table_nested",
+            "table_property_siblings",
+        }
+        for case, missed, invalid in table_cases():
+            if case.ident in selected:
+                assert not missed and not invalid
+                rows.append(Scenario(case, "helpers/table_cases.py"))
     return rows

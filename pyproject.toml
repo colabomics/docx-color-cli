@@ -60,7 +60,12 @@ include = [
     "/uv.lock",
 ]
 
-exclude = ["/tests/fixtures/academic/**", "**/*.docx", "**/.DS_Store"]
+exclude = [
+    "/tests/fixtures/academic/**",
+    "/scripts/generate_demo.py",
+    "**/*.docx",
+    "**/.DS_Store",
+]
 
 [tool.ruff]
 target-version = "py311"

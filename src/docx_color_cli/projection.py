@@ -71,13 +71,39 @@ def context(p, root):
         if a.tag in {W + "footnote", W + "endnote"}:
             result.append((etree.QName(a).localname, a.get(W + "id")))
         if a.tag == W + "tbl":
-            shape = tuple(len(r.findall(W + "tc")) for r in a.findall(W + "tr"))
+            # Formatting siblings do not identify cells, but logical-grid
+            # properties do: equal physical cell counts alone are insufficient.
+            shape = tuple(
+                (
+                    grid_properties(r, "trPr", {"gridBefore", "gridAfter"}),
+                    tuple(
+                        grid_properties(c, "tcPr", {"gridSpan", "vMerge", "hMerge"})
+                        for c in r.findall(W + "tc")
+                    ),
+                )
+                for r in a.findall(W + "tr")
+            )
             result.append(("table", tables.index(a), shape))
         elif a.tag in {W + "tr", W + "tc"}:
-            result.append((etree.QName(a).localname, list(a.getparent()).index(a)))
+            # Word may add tblPrEx/trPr before cells or tblPr/tblGrid before
+            # rows. Count only siblings of the same content-bearing kind.
+            result.append(
+                (etree.QName(a).localname, a.getparent().findall(a.tag).index(a))
+            )
         elif a.tag == W + "txbxContent":
             result.append(("textbox", list(root.iter(W + "txbxContent")).index(a)))
     return tuple(result)
+
+
+def grid_properties(node, property_tag, names):
+    props = node.find(W + property_tag)
+    if props is None:
+        return ()
+    return tuple(
+        (n.tag, tuple(sorted(n.attrib.items())))
+        for n in props
+        if n.tag in {W + name for name in names}
+    )
 
 
 def range_paragraphs(nodes, active_all):
