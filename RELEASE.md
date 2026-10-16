@@ -5,9 +5,9 @@ The `Publish` workflow now accepts only a deliberate `workflow_dispatch` event
 on `main`, with an exact version and an upload request that defaults to **false**.
 It runs the complete nine-job OS/Python matrix before building distributions.
 
-This checkout is an unreleased breaking CLI/API migration, still numbered 1.0.1.
-Do not upload it as a replacement for an existing 1.0.1 release. Version selection,
-commits, pushes, tags and publication require a separate reviewed decision.
+Release artifacts must match the reviewed 1.1.0 source and package metadata.
+Building or validating artifacts does not authorize publication. Commits, pushes,
+tags and publication require explicit authorization.
 
 ## Required owner configuration (not performed by local validation)
 
@@ -99,7 +99,7 @@ uv run pytest -q
 uv run ruff check .
 uv run ruff format --check .
 uv build
-uv run twine check --strict dist/docx_color_cli-1.0.1-py3-none-any.whl dist/docx_color_cli-1.0.1.tar.gz
+uv run twine check --strict dist/docx_color_cli-1.1.0-py3-none-any.whl dist/docx_color_cli-1.1.0.tar.gz
 uv run python scripts/smoke_wheel.py dist
 ```
 

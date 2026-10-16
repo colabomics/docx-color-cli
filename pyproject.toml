@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docx-color-cli"
-version = "1.0.1"
+version = "1.1.0"
 description = "Color surviving insertions on a corresponding Word-accepted DOCX"
 readme = "README.md"
 authors = [{name = "lzj1769", email = "lzj1769@gmail.com"}]
@@ -52,6 +52,7 @@ include = [
     "/README.md",
     "/README.zh-CN.md",
     "/RELEASE.md",
+    "/RELEASE_NOTES_1.1.0.md",
     "/scripts/**/*.py",
     "/.github/workflows/*.yml",
     "/release-provenance.json",

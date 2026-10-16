@@ -71,22 +71,16 @@ The tool automatically identifies additions and colors the text it can reliably 
 
 You'll need **Python 3.11 or newer**.
 
-The new version hasn't been officially released yet, so for now, install it from a local checkout of the latest development code:
-
-```bash
-python -m pip install .
-```
-
-Or, if you're using [uv](https://docs.astral.sh/uv/):
-
-```bash
-uv tool install .
-```
-
-Once the new version is released, installation will be even easier:
+Install with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv tool install docx-color-cli
+```
+
+Or install with pip:
+
+```bash
+python -m pip install docx-color-cli
 ```
 
 ### Step 2: Prepare two Word documents
@@ -284,7 +278,7 @@ The tool can save you a lot of repetitive work, but there are a few things worth
 - Give your DOCX output and JSON report clearly different filenames. Don't distinguish them by capitalization alone.
 - **Always check the final document before sending it back to the journal.**
 
-The development version has been tested locally on macOS with Python 3.11, 3.12, and 3.13. Cross-platform validation on Linux and Windows is still in progress.
+Tested on macOS, Ubuntu, and Windows with Python 3.11, 3.12, and 3.13.
 
 ## 🐍 Want to Use It in Python?
 
@@ -304,12 +298,6 @@ print(result["overall_status"])
 ```
 
 The API also provides error information to help your scripts handle unsuccessful conversions.
-
-**Coming from an older version?**
-
-The new workflow requires three file paths. The previous one- or two-file workflow and options such as `--unchanged-color`, `--reference`, and `--check` are no longer supported.
-
-For Python users, the new entry point is `color_revisions()`.
 
 ## ❤️ Let's Make It Better!
 

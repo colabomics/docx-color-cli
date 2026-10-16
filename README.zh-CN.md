@@ -71,22 +71,16 @@ docx-color \
 
 需要 Python 3.11 或更新版本。
 
-目前新版还没有正式发布，可以先从最新开发代码安装：
-
-```bash
-python -m pip install .
-```
-
-如果你使用 [uv](https://docs.astral.sh/uv/)，也可以：
-
-```bash
-uv tool install .
-```
-
-等新版正式发布后，安装会更简单：
+使用 [uv](https://docs.astral.sh/uv/) 安装：
 
 ```bash
 uv tool install docx-color-cli
+```
+
+或者使用 pip：
+
+```bash
+python -m pip install docx-color-cli
 ```
 
 ### 第二步：准备两个 Word 文件
@@ -282,7 +276,7 @@ Word 修订记录有时比想象中复杂。
 - 输出文件和 JSON 报告请使用明显不同的文件名，不要只靠大小写区分。
 - **投稿之前，记得检查一下最终文档。**
 
-目前工具已在 macOS 上使用 Python 3.11、3.12 和 3.13 完成本地测试。Linux 和 Windows 的跨平台验证仍在进行中。
+工具已在 macOS、Ubuntu 和 Windows 上使用 Python 3.11、3.12 和 3.13 完成测试。
 
 ## 🐍 还可以在 Python 中使用
 
@@ -302,10 +296,6 @@ print(result["overall_status"])
 ```
 
 程序也会提供相应的错误信息，方便你在脚本中判断是否处理成功。
-
-如果你以前用过旧版，需要注意：新版改成了三个文件路径，旧的一文件或两文件工作流程以及 `--unchanged-color`、`--reference`、`--check` 等参数已不再支持。
-
-Python 用户请改用 `color_revisions()`。
 
 ## ❤️ 欢迎一起改进！
 
