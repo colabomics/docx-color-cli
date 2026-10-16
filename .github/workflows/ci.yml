@@ -62,6 +62,10 @@ jobs:
           import subprocess
           from pathlib import Path
           subprocess.run(["uv", "build"], check=True)
-          subprocess.run(["uv", "run", "--no-sync", "twine", "check", "--strict", *map(str, Path("dist").glob("*"))], check=True)
+          wheels = sorted(Path("dist").glob("*.whl"))
+          sdists = sorted(Path("dist").glob("*.tar.gz"))
+          if not wheels or not sdists:
+              raise RuntimeError("Expected at least one wheel and one source distribution")
+          subprocess.run(["uv", "run", "--no-sync", "twine", "check", "--strict", *map(str, wheels + sdists)], check=True)
       - name: Clean wheel installation and conversion
-        run: uv run --no-sync python scripts/smoke_wheel.py dist
+        run: uv run --no-sync python scripts/smoke_wheel.py dist --tracked examples/change_tracked.docx --accepted examples/change_accepted.docx

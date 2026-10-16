@@ -17,6 +17,7 @@ from docx_color_cli import color_revisions
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 M = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def fixture(path, *, accepted=False):
@@ -156,7 +157,7 @@ def assert_installed_location(location, venv):
 
 
 def smoke(wheel, *, tracked_reference=None, accepted_reference=None):
-    version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+    version = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
     check_distributions(wheel, version)
     with tempfile.TemporaryDirectory(prefix="docx-wheel-") as directory:
         work = Path(directory)
@@ -240,21 +241,21 @@ def smoke(wheel, *, tracked_reference=None, accepted_reference=None):
             accepted_reference = accepted_reference.resolve()
             hashes = (tracked_reference.read_bytes(), accepted_reference.read_bytes())
             local_output, installed_output = (
-                work / "local-private.docx",
-                work / "installed-private.docx",
+                work / "local-example.docx",
+                work / "installed-example.docx",
             )
             local = color_revisions(tracked_reference, accepted_reference, local_output)
-            private_report = work / "private-report.json"
+            example_report = work / "example-report.json"
             run(
                 command,
                 tracked_reference,
                 accepted_reference,
                 installed_output,
                 "--report",
-                private_report,
+                example_report,
             )
             assert local_output.read_bytes() == installed_output.read_bytes()
-            installed = json.loads(private_report.read_text())
+            installed = json.loads(example_report.read_text())
             for key in (
                 "extraction",
                 "mapping",
@@ -267,8 +268,17 @@ def smoke(wheel, *, tracked_reference=None, accepted_reference=None):
                 tracked_reference.read_bytes(),
                 accepted_reference.read_bytes(),
             ) == hashes
+            # Test-only stdlib oracle; never imported by the installed package.
+            sys.path.insert(0, str(ROOT / "tests"))
+            from helpers.public_example import verify_public_example
+
+            verify_public_example(
+                tracked_reference, accepted_reference, installed_output, installed
+            )
             print(
-                "Clean wheel private-pair equivalence passed (no manuscript text logged)."
+                "Public example smoke PASS: publication=SUCCESS coloring=SUCCESS "
+                "overall=SUCCESS colored=3075 unresolved=0 table_characters=34 "
+                "unauthorized=0 fidelity=PASS; inputs unchanged; wheel parity=PASS"
             )
         print(f"Clean wheel smoke passed: {version}; installed import: {location}")
 

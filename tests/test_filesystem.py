@@ -232,7 +232,7 @@ def test_unicode_output_in_ascii_pipe_reports_published_success(tmp_path):
         check=False,
     )
     assert result.returncode == 0
-    assert b"Status:\n  SUCCESS" in result.stdout
+    assert b"Status:\n  SUCCESS" in result.stdout.replace(b"\r\n", b"\n")
     assert b"Traceback" not in result.stderr
     assert rb"\u7ed3\u679c.docx" in result.stdout
     assert (
