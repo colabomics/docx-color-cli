@@ -17,3 +17,4 @@ tests/fixtures/academic/
 
 # Reproducible public benchmark materializations.
 /.benchmark-output/
+/examples/private*.docx
